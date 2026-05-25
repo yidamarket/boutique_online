@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Yida Food · Boutique</title>
+    <link rel="stylesheet" href="shop.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../config.js"></script>
+    <script src="shop.js" defer></script>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <nav class="navbar">
+        <div class="logo" onclick="window.location.href='shop.html'">
+            <img src="logo.jpg" alt="Yida Food" class="logo-img" onerror="this.src='https://placehold.co/48x48/e63946/white?text=Y'">
+            <div class="logo-text">Yida Food</div>
+        </div>
+        
+        <div class="nav-links">
+            <a href="../client_orders/client_orders.html" class="nav-link" id="ordersLink">Mes commandes</a>
+            <div class="lang-switch">
+                <button class="lang-btn" data-lang="fr">FR</button>
+                <button class="lang-btn" data-lang="zh">中文</button>
+            </div>
+            <div class="cart-icon" id="cartIcon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="20" r="1.5"/>
+                    <circle cx="18" cy="20" r="1.5"/>
+                    <path d="M2 2h2l2.5 12h12l2-8H5"/>
+                </svg>
+                <span class="cart-count" id="cartCount">0</span>
+            </div>
+            <div id="authSection">
+                <button class="login-btn-nav" id="loginBtnNav">Connexion</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 滚动优惠横幅 -->
+    <div class="promo-marquee" id="promoMarquee" style="display: none;">
+        <div class="marquee-content" id="marqueeContent"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 欢迎横幅 -->
+        <div class="hero-banner">
+            <div class="hero-content">
+                <h1 class="hero-title" id="heroTitle">Bienvenue chez Yida Food</h1>
+                <p class="hero-subtitle" id="heroSubtitle">Produits asiatiques de qualité, livraison rapide</p>
+            </div>
+        </div>
+
+        <!-- 分类导航栏（仅在商品列表页显示） -->
+        <div class="category-section" id="categorySection" style="display: none;">
+            <h2 class="section-title" id="categoryTitle">Nos catégories</h2>
+            <div class="category-tabs" id="categoryTabs">
+                <button class="category-tab" data-category="all" id="catAll">Tous les produits</button>
+                <button class="category-tab" data-category="dry" id="catDry">🥨 Sec</button>
+                <button class="category-tab" data-category="frozen" id="catFrozen">❄️ Surgelé</button>
+                <button class="category-tab" data-category="fresh" id="catFresh">🥬 Frais</button>
+                <button class="category-tab" data-category="nonfood" id="catNonfood">🧴 Hygiène</button>
+                <button class="category-tab" data-category="drinks" id="catDrinks">🍷 Boissons</button>
+                <button class="category-tab" data-category="bangkok" id="catBangkok">🏭 Bangkok Factory</button>
+                <button class="category-tab" data-category="packaging" id="catPackaging">🎒 Sacs d'emballage</button>
+                <button class="category-tab" data-category="seasoning" id="catSeasoning">🧂 Assaisonnement</button>
+                <button class="category-tab" data-category="promotion" id="catPromotion">🔥 Promotion</button>
+            </div>
+        </div>
+
+        <!-- 大类卡片首页 -->
+        <div id="categoriesGrid" class="categories-grid">
+            <!-- 8个大类卡片会动态生成 -->
+        </div>
+
+        <!-- 商品列表（初始隐藏） -->
+        <div id="productsSection" style="display: none;">
+            <div class="back-button-container">
+                <button class="back-to-categories" id="backToCategoriesBtn">← Retour aux catégories</button>
+            </div>
+            <div id="productsGrid" class="products-grid">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Chargement...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 购物车侧边栏 -->
+    <div id="cartSidebar" class="cart-sidebar">
+        <div class="cart-header">
+            <h3 id="cartTitle">Mon panier</h3>
+            <button class="close-cart" id="closeCartBtn">&times;</button>
+        </div>
+        <div id="cartItems" class="cart-items">
+            <div class="empty-cart">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5">
+                    <circle cx="9" cy="20" r="1.5"/>
+                    <circle cx="18" cy="20" r="1.5"/>
+                    <path d="M2 2h2l2.5 12h12l2-8H5"/>
+                </svg>
+                <p>Votre panier est vide</p>
+            </div>
+        </div>
+        <div class="cart-footer">
+            <div id="discountTags" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
+            <div class="cart-total">
+                <span id="totalLabel">Total</span>
+                <span id="cartTotal">0.00 €</span>
+            </div>
+            <button class="checkout-btn" id="checkoutBtn">Commander</button>
+        </div>
+    </div>
+
+    <!-- 登录/注册模态框 -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Connexion</h2>
+                <button class="close-modal" id="closeModalBtn">&times;</button>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab active" data-tab="login" id="tabLogin">Connexion</button>
+                <button class="tab" data-tab="register" id="tabRegister">Inscription</button>
+            </div>
+            
+            <div id="loginForm" class="tab-content active">
+                <div class="form-group">
+                    <label id="emailLabel">Email</label>
+                    <input type="email" id="loginEmail" class="form-input" placeholder="client@yida.com">
+                </div>
+                <div class="form-group">
+                    <label id="passwordLabel">Mot de passe</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="••••••••">
+                </div>
+                <button id="doLoginBtn" class="btn-primary">Se connecter</button>
+                <div id="loginError" class="error-msg"></div>
+            </div>
+            
+            <div id="registerForm" class="tab-content">
+                <div class="form-group">
+                    <label id="regEmailLabel">Email *</label>
+                    <input type="email" id="regEmail" class="form-input" placeholder="client@yida.com">
+                </div>
+                <div class="form-group">
+                    <label id="regPasswordLabel">Mot de passe *</label>
+                    <input type="password" id="regPassword" class="form-input" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label id="regCompanyLabel">Nom de l'entreprise *</label>
+                    <input type="text" id="regCompany" class="form-input" placeholder="Yida Food">
+                </div>
+                <div class="form-group">
+                    <label id="regAddressLabel">Adresse *</label>
+                    <input type="text" id="regAddress" class="form-input" placeholder="123 rue de Paris">
+                </div>
+                <div class="form-group">
+                    <label id="regPhoneLabel">Téléphone *</label>
+                    <input type="tel" id="regPhone" class="form-input" placeholder="01 23 45 67 89">
+                </div>
+                <div class="form-group">
+                    <label id="regKbisLabel">Numéro KBIS *</label>
+                    <input type="text" id="regKbis" class="form-input" placeholder="KBIS123456">
+                </div>
+                <button id="doRegisterBtn" class="btn-primary">S'inscrire</button>
+                <div id="registerError" class="error-msg"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 下单模态框 -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content order-modal">
+            <div class="modal-header">
+                <h2 id="orderTitle">Confirmation de commande</h2>
+                <button class="close-modal" id="closeOrderModalBtn">&times;</button>
+            </div>
+            
+            <div id="orderItems" class="order-items"></div>
+            
+            <div class="form-group" id="couponSection">
+                <label id="couponLabel">Code promo</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="couponCodeInput" class="form-input" placeholder="ex: YIDA-XXXXXX" style="flex: 1;">
+                    <button type="button" id="applyCouponBtn" class="btn-secondary">Appliquer</button>
+                </div>
+                <div id="couponMessage" style="font-size: 12px; margin-top: 8px;"></div>
+            </div>
+            
+            <div class="form-group" id="pointsSection">
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="usePointsCheckbox">
+                        <span id="usePointsLabel">Utiliser mes points</span>
+                    </label>
+                </div>
+                <div id="pointsInfo" style="font-size: 12px; color: #64748b; margin-top: 5px;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label id="deliveryDateLabel">Date de livraison *</label>
+                <input type="date" id="deliveryDate" class="form-input">
+            </div>
+            
+            <div class="form-group">
+                <label id="deliveryTimeLabel">Créneau horaire *</label>
+                <select id="deliveryTimeSlot" class="form-input">
+                    <option value="flexible">🕒 Flexible (selon disponibilité du livreur)</option>
+                    <option value="09:00-10:00">09:00 - 10:00</option>
+                    <option value="10:00-11:00">10:00 - 11:00</option>
+                    <option value="11:00-12:00">11:00 - 12:00</option>
+                    <option value="12:00-13:00">12:00 - 13:00</option>
+                    <option value="13:00-14:00">13:00 - 14:00</option>
+                    <option value="14:00-15:00">14:00 - 15:00</option>
+                    <option value="15:00-16:00">15:00 - 16:00</option>
+                    <option value="16:00-17:00">16:00 - 17:00</option>
+                    <option value="17:00-18:00">17:00 - 18:00</option>
+                    <option value="18:00-19:00">18:00 - 19:00</option>
+                    <option value="19:00-20:00">19:00 - 20:00</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label id="notesLabel">Notes</label>
+                <textarea id="orderNotes" class="form-input" rows="3" placeholder="Instructions particulières..."></textarea>
+            </div>
+            
+            <div class="order-total" id="orderTotalArea">
+                <span id="totalOrderLabel">Total</span>
+                <span id="orderTotalAmount">0.00 €</span>
+            </div>
+            
+            <button id="submitOrderBtn" class="btn-primary">Confirmer la commande</button>
+            <div id="orderError" class="error-msg"></div>
+        </div>
+    </div>
+
+    <div id="customToast" class="custom-toast">
+        <span id="toastIcon">✅</span>
+        <span id="toastMessage"></span>
+    </div>
+</body>
+</html>
