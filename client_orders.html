@@ -1,0 +1,248 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Yida Food · Mon espace</title>
+    <link rel="stylesheet" href="client_orders.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../config.js"></script>
+    <script src="client_orders.js" defer></script>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <nav class="navbar">
+        <div class="logo" onclick="window.location.href='../shop/shop.html'">
+            <div class="logo-icon">🥢</div>
+            <div class="logo-text">Yida Food</div>
+        </div>
+        
+        <div class="nav-links">
+            <a href="../shop/shop.html" class="nav-link" id="shopLink">Boutique</a>
+            <a href="client_orders.html" class="nav-link active" id="ordersLink">Mon espace</a>
+            <a href="#" class="nav-link" id="settingsLink" onclick="showSettingsModal()">⚙️ Paramètres</a>
+            <div class="lang-switch">
+                <button class="lang-btn" data-lang="fr">FR</button>
+                <button class="lang-btn" data-lang="zh">中文</button>
+            </div>
+            <div id="authSection">
+                <span class="user-name" id="userName"></span>
+                <span class="logout-link" id="logoutBtn">Déconnexion</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 欢迎横幅 -->
+        <div class="hero-banner">
+            <div class="hero-content">
+                <h1 class="hero-title" id="heroTitle">📋 Mon espace</h1>
+                <p class="hero-subtitle" id="heroSubtitle">Gérez vos points et commandes</p>
+            </div>
+        </div>
+
+        <!-- 积分卡片 -->
+        <div class="points-card">
+            <div class="points-card-left">
+                <div class="points-icon">⭐</div>
+                <div class="points-info">
+                    <span class="points-label" id="pointsLabel">Mes points</span>
+                    <span class="points-value" id="pointsValue">0</span>
+                </div>
+            </div>
+            <div class="points-pending" id="pointsPending" style="display: none;">
+                <span class="pending-label" id="pendingLabel">Points à venir</span>
+                <span class="pending-value" id="pendingValue">0</span>
+            </div>
+        </div>
+
+        <!-- 筛选标签 -->
+        <div class="filter-section">
+            <h2 class="section-title" id="filterTitle">Mes commandes</h2>
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-status="all" id="filterAll">Toutes</button>
+                <button class="filter-tab" data-status="pending" id="filterPending">📝 En attente</button>
+                <button class="filter-tab" data-status="confirmed" id="filterConfirmed">✅ Confirmée</button>
+                <button class="filter-tab" data-status="delivered" id="filterDelivered">🚚 Livrée</button>
+                <button class="filter-tab" data-status="cancelled" id="filterCancelled">❌ Annulée</button>
+            </div>
+        </div>
+
+        <!-- 订单列表 -->
+        <div id="ordersList" class="orders-list">
+            <div class="loading-state">
+                <div class="loading-spinner"></div>
+                <p>Chargement...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 订单详情模态框 -->
+    <div id="orderDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Détails de la commande</h2>
+                <button class="close-modal" id="closeModalBtn">&times;</button>
+            </div>
+            <div id="orderDetailContent" class="order-detail-content"></div>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content settings-modal">
+            <button class="modal-close" id="closeSettingsBtn">&times;</button>
+            
+            <div class="settings-header">
+                <div class="settings-avatar">
+                    <span>👤</span>
+                </div>
+                <h2 id="settingsTitle">Paramètres</h2>
+                <p id="settingsSubtitle">Modifiez vos informations personnelles</p>
+            </div>
+            
+            <div class="settings-tabs">
+                <button class="settings-tab active" data-tab="password">
+                    <span class="tab-emoji">🔒</span>
+                    <span id="tabPasswordText">Mot de passe</span>
+                </button>
+                <button class="settings-tab" data-tab="address">
+                    <span class="tab-emoji">📍</span>
+                    <span id="tabAddressText">Adresse</span>
+                </button>
+                <button class="settings-tab" data-tab="phone">
+                    <span class="tab-emoji">📞</span>
+                    <span id="tabPhoneText">Téléphone</span>
+                </button>
+                <button class="settings-tab" data-tab="kbis">
+                    <span class="tab-emoji">📄</span>
+                    <span id="tabKbisText">KBIS</span>
+                </button>
+                <button class="settings-tab" data-tab="requests">
+                    <span class="tab-emoji">📋</span>
+                    <span id="tabRequestsText">Mes demandes</span>
+                </button>
+            </div>
+            
+            <!-- 修改密码 -->
+            <div id="passwordPanel" class="settings-panel active">
+                <div class="settings-card">
+                    <div class="input-group">
+                        <label id="currentPasswordLabel">Mot de passe actuel</label>
+                        <input type="password" id="currentPassword" class="input-field" placeholder="Entrez votre mot de passe actuel">
+                    </div>
+                    <div class="input-group">
+                        <label id="newPasswordLabel">Nouveau mot de passe</label>
+                        <input type="password" id="newPassword" class="input-field" placeholder="Au moins 6 caractères">
+                    </div>
+                    <div class="input-group">
+                        <label id="confirmPasswordLabel">Confirmer le mot de passe</label>
+                        <input type="password" id="confirmPassword" class="input-field" placeholder="Retapez le nouveau mot de passe">
+                    </div>
+                    <button class="btn-submit" id="submitPasswordBtn">
+                        <span>📨</span> <span id="submitPasswordText">Envoyer la demande</span>
+                    </button>
+                    <div id="passwordMessage" class="form-message"></div>
+                </div>
+            </div>
+            
+            <!-- 修改地址 -->
+            <div id="addressPanel" class="settings-panel">
+                <div class="settings-card">
+                    <div class="info-badge">
+                        <span>📍</span>
+                        <div>
+                            <div class="info-badge-label" id="currentAddressLabel">Adresse actuelle</div>
+                            <div class="info-badge-value" id="currentAddressDisplay">-</div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label id="newAddressLabel">Nouvelle adresse</label>
+                        <input type="text" id="newAddress" class="input-field" placeholder="Rue, ville, code postal">
+                    </div>
+                    <button class="btn-submit" id="submitAddressBtn">
+                        <span>📨</span> <span id="submitAddressText">Envoyer la demande</span>
+                    </button>
+                    <div id="addressMessage" class="form-message"></div>
+                </div>
+            </div>
+            
+            <!-- 修改电话 -->
+            <div id="phonePanel" class="settings-panel">
+                <div class="settings-card">
+                    <div class="info-badge">
+                        <span>📞</span>
+                        <div>
+                            <div class="info-badge-label" id="currentPhoneLabel">Téléphone actuel</div>
+                            <div class="info-badge-value" id="currentPhoneDisplay">-</div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label id="newPhoneLabel">Nouveau téléphone</label>
+                        <input type="tel" id="newPhone" class="input-field" placeholder="01 23 45 67 89">
+                    </div>
+                    <button class="btn-submit" id="submitPhoneBtn">
+                        <span>📨</span> <span id="submitPhoneText">Envoyer la demande</span>
+                    </button>
+                    <div id="phoneMessage" class="form-message"></div>
+                </div>
+            </div>
+            
+            <!-- 修改 KBIS -->
+            <div id="kbisPanel" class="settings-panel">
+                <div class="settings-card">
+                    <div class="info-badge">
+                        <span>📄</span>
+                        <div>
+                            <div class="info-badge-label" id="currentKbisLabel">Numéro KBIS actuel</div>
+                            <div class="info-badge-value" id="currentKbisDisplay">-</div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label id="newKbisLabel">Nouveau numéro KBIS</label>
+                        <input type="text" id="newKbis" class="input-field" placeholder="ex: KBIS12345678">
+                    </div>
+                    <button class="btn-submit" id="submitKbisBtn">
+                        <span>📨</span> <span id="submitKbisText">Envoyer la demande</span>
+                    </button>
+                    <div id="kbisMessage" class="form-message"></div>
+                </div>
+            </div>
+            
+            <!-- 我的申请（历史请求） -->
+            <div id="requestsPanel" class="settings-panel">
+                <div class="settings-card">
+                    <div id="userRequestsList" class="requests-history">
+                        <div class="empty-requests" id="emptyRequestsText">Aucune demande en cours</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-note" id="infoNote">
+                ⚠️ Les modifications seront appliquées après validation par l'administrateur.
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义确认框 -->
+    <div id="customConfirmModal" class="custom-modal">
+        <div class="custom-modal-content">
+            <div class="custom-modal-icon">❓</div>
+            <h3 class="custom-modal-title" id="confirmTitle">Confirmation</h3>
+            <p class="custom-modal-message" id="confirmMessage">Êtes-vous sûr ?</p>
+            <div class="custom-modal-buttons">
+                <button class="custom-modal-btn cancel" id="confirmCancelBtn">Annuler</button>
+                <button class="custom-modal-btn confirm" id="confirmOkBtn">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义提示框 -->
+    <div id="customToast" class="custom-toast">
+        <span id="toastIcon">✅</span>
+        <span id="toastMessage"></span>
+    </div>
+</body>
+</html>
