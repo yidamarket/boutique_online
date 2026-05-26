@@ -1,4 +1,4 @@
-// ========== shop.js ==========
+// ========== shop.js - 完整版 ==========
 let currentLang = 'fr';
 let products = [];
 let cart = [];
@@ -13,8 +13,12 @@ let pointsDiscount = 0;
 let pointsToUse = 0;
 let currentCategory = 'all';
 
-let currentPromotionDiscount = 0;    // 当前促销折扣金额
-let currentAppliedPromotions = [];  // 当前使用的促销活动数组
+let currentAutoPromotions = [];  // 当前使用的自动促销
+let currentAutoDiscount = 0;     // 当前自动促销总折扣
+let availableCoupons = [];           // 已输入的有效优惠码列表 [{code, promo, discount}]
+let selectedCoupon = null;          // 当前选中的优惠码
+let selectedCouponDiscount = 0;     // 当前选中的优惠码折扣
+
 // 分类标签映射
 const categoryLabels = {
     'dry': { fr: 'Sec', zh: '干货' },
@@ -27,6 +31,7 @@ const categoryLabels = {
     'seasoning': { fr: 'Assaisonnement', zh: '调味料' },
     'promotion': { fr: 'Promotion', zh: '促销' }
 };
+
 // 8个大类配置
 const mainCategories = [
     { id: 'dry', icon: '🥨', color: '#fef3c7', name_fr: 'Sec', name_zh: '干货', image: 'categories/dry.png' },
@@ -38,6 +43,7 @@ const mainCategories = [
     { id: 'packaging', icon: '🎒', color: '#e0e7ff', name_fr: 'Sacs d\'emballage', name_zh: '打包带', image: 'categories/packaging.png' },
     { id: 'seasoning', icon: '🧂', color: '#fed7aa', name_fr: 'Assaisonnement', name_zh: '调味料', image: 'categories/seasoning.png' }
 ];
+
 const categoryClasses = {
     'dry': 'category-dry',
     'frozen': 'category-frozen',
@@ -69,7 +75,7 @@ const translations = {
         catFresh: "🥬 Frais",
         catNonfood: "🧴 Hygiène",
         cartTitle: "Mon panier",
-        catPromotion: "🔥 Promotion",  // 添加这一行
+        catPromotion: "🔥 Promotion",
         total: "Total",
         checkout: "Commander",
         emptyCart: "Votre panier est vide",
@@ -118,25 +124,42 @@ const translations = {
         emptyProducts: "Aucun produit dans cette catégorie",
         uploadImage: "Ajouter une image",
         promotionConflict: "Promotions non cumulables",
-        cannotStack: "Les promotions ne peuvent pas être cumulées. Choisissez celle que vous souhaitez conserver :",
-        keepExisting: "Garder celle-ci",
-        useNew: "Utiliser la nouvelle",
-        discountApplied: "Réduction appliquée",
-        remove: "Supprimer",
-         outOfStock: "Rupture de stock",
-         discountDetails: "Détails des réductions"
-
+        cannotStack: "Cette promotion ne peut pas être combinée avec les promotions déjà sélectionnées.",
+        replace: "Remplacer",
+        cancel: "Annuler",
+        confirm: "Confirmer",
+        outOfStock: "Rupture de stock",
+        discountDetails: "Détails des réductions",
+        removeAll: "Supprimer toutes",
+        couponInvalid: "Code invalide",
+        couponNotApplicable: "Code non applicable",
+        couponConflict: "Ce code promo ne peut pas être utilisé avec les promotions actuelles.",
+        useCouponOnly: "Utiliser uniquement le code",
+        keepPromos: "Garder les promotions",
+        activePromos: "Promotions activées",
+        availablePromos: "Promotions disponibles",
+        couponAdded: "ajouté à la liste",
+couponActivated: "activé",
+couponDeactivated: "désactivé",
+couponAlreadyInList: "Code déjà dans la liste",
+replaceQuestion: "Voulez-vous remplacer les promotions actuelles par celle-ci ?",
+success: "Succès",
+couponValid: "Code valide",
+warning: "Attention"
     },
-    zh: {
-        discountDetails: "优惠详情",
+    zh: {couponValid: "优惠码有效",
+        
+        success: "成功",
+        warning: "警告",
+        replaceQuestion: "是否用此优惠替换当前优惠？",
+        catDrinks: "🍷 酒水",
+        catBangkok: "🍜 曼谷工厂特供",
+        catPackaging: "🎒 打包带",
+        catSeasoning: "🧂 调味料",
         buyNGetMPromo: "买N送M",
         free: "免费",
-        catDrinks: "🍷 酒水",
-catDrinks: "🍷 酒水",
-catBangkok: "🍜 曼谷工厂特供",
-catPackaging: "🎒 打包带",
-catSeasoning: "🧂 调味料",
-         stockInsufficient: "库存不足",
+        confirm: "确认",
+        stockInsufficient: "库存不足",
         stockAvailable: "可用库存",
         heroTitle: "欢迎来到 Yida Food",
         heroSubtitle: "优质亚洲食品，快速配送",
@@ -145,8 +168,8 @@ catSeasoning: "🧂 调味料",
         catDry: "🥨 干货",
         catFrozen: "❄️ 速冻",
         catFresh: "🥬 生鲜",
-        catNonfood: "🧴 卫生yongp",
-        catPromotion: "🔥 促销", 
+        catNonfood: "🧴 卫生用品",
+        catPromotion: "🔥 促销",
         cartTitle: "我的购物车",
         total: "合计",
         checkout: "去结算",
@@ -196,12 +219,23 @@ catSeasoning: "🧂 调味料",
         emptyProducts: "该分类下暂无商品",
         uploadImage: "上传图片",
         promotionConflict: "优惠不可叠加",
-        cannotStack: "优惠活动不能叠加使用，请选择保留哪一个：",
-        keepExisting: "保留当前",
-        useNew: "使用新的",
-        discountApplied: "已应用优惠",
-        remove: "移除",
-         outOfStock: "缺货"
+        cannotStack: "该优惠不能与已选优惠同时使用。",
+        replace: "替换",
+        cancel: "取消",
+        outOfStock: "缺货",
+        discountDetails: "优惠详情",
+        removeAll: "清除所有",
+        couponInvalid: "优惠码无效",
+        couponNotApplicable: "优惠码不适用",
+        couponConflict: "优惠码不能与当前优惠同时使用。",
+        useCouponOnly: "仅使用优惠码",
+        keepPromos: "保留当前优惠",
+        couponAdded: "已添加到列表",
+        couponActivated: "已激活",
+        couponDeactivated: "已取消",
+        couponAlreadyInList: "优惠码已在列表中",
+        activePromos: "已激活优惠",
+        availablePromos: "可用优惠"
     }
 };
 
@@ -218,7 +252,58 @@ function showToast(message, type = 'success') {
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
+// 自定义确认弹窗（美观版）
+function showCustomConfirm(title, message, onConfirm, onCancel) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6); display: flex; justify-content: center;
+        align-items: center; z-index: 10010; backdrop-filter: blur(4px);
+    `;
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 24px; width: 360px; max-width: 85%; padding: 24px 20px; text-align: center; box-shadow: 0 20px 35px -8px rgba(0,0,0,0.2);">
+            <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
+            <h3 style="color: #1e293b; margin-bottom: 8px; font-size: 20px;">${escapeHtml(title)}</h3>
+            <p style="color: #64748b; margin-bottom: 24px; font-size: 14px; line-height: 1.5;">${escapeHtml(message)}</p>
+            <div style="display: flex; gap: 12px;">
+                <button id="dialogCancelBtn" style="flex:1; background: #f1f5f9; color: #64748b; border: none; padding: 12px; border-radius: 40px; font-weight: 600; cursor: pointer; font-size: 14px;">${translations[currentLang].cancel}</button>
+                <button id="dialogConfirmBtn" style="flex:1; background: #e63946; color: white; border: none; padding: 12px; border-radius: 40px; font-weight: 600; cursor: pointer; font-size: 14px;">${translations[currentLang].confirm}</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    document.getElementById('dialogConfirmBtn').onclick = () => {
+        document.body.removeChild(modal);
+        if (onConfirm) onConfirm();
+    };
+    document.getElementById('dialogCancelBtn').onclick = () => {
+        document.body.removeChild(modal);
+        if (onCancel) onCancel();
+    };
+}
 
+// 自定义信息弹窗
+function showCustomInfo(title, message, type = 'info') {
+    const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+    const colors = { success: '#10b981', error: '#e63946', warning: '#f59e0b', info: '#3b82f6' };
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6); display: flex; justify-content: center;
+        align-items: center; z-index: 10010; backdrop-filter: blur(4px);
+    `;
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 24px; width: 340px; max-width: 85%; padding: 24px 20px; text-align: center; box-shadow: 0 20px 35px -8px rgba(0,0,0,0.2);">
+            <div style="font-size: 48px; margin-bottom: 12px;">${icons[type]}</div>
+            <h3 style="color: #1e293b; margin-bottom: 8px; font-size: 20px;">${escapeHtml(title)}</h3>
+            <p style="color: #64748b; margin-bottom: 24px; font-size: 14px; line-height: 1.5;">${escapeHtml(message)}</p>
+            <button id="dialogOkBtn" style="background: ${colors[type]}; color: white; border: none; padding: 12px 24px; border-radius: 40px; font-weight: 600; cursor: pointer; font-size: 14px;">${translations[currentLang].confirm}</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('dialogOkBtn').onclick = () => document.body.removeChild(modal);
+}
 function formatPrice(price) {
     return parseFloat(price).toFixed(2);
 }
@@ -229,6 +314,7 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
 function renderCategories() {
     const container = document.getElementById('categoriesGrid');
     if (!container) return;
@@ -256,15 +342,12 @@ function renderCategories() {
     
     container.innerHTML = html;
 }
+
 window.selectCategory = function(categoryId) {
     currentCategory = categoryId;
-    // 隐藏大类卡片页面
     document.getElementById('categoriesGrid').style.display = 'none';
-    // 显示商品列表区域
     document.getElementById('productsSection').style.display = 'block';
-    // 显示分类导航栏
     document.getElementById('categorySection').style.display = 'block';
-    // 高亮对应的分类按钮
     document.querySelectorAll('.category-tab').forEach(tab => {
         if (tab.dataset.category === categoryId) {
             tab.classList.add('active');
@@ -272,87 +355,19 @@ window.selectCategory = function(categoryId) {
             tab.classList.remove('active');
         }
     });
-    // 加载并显示商品
     renderProducts();
 };
+
 window.backToCategories = function() {
-    // 显示大类卡片页面
     document.getElementById('categoriesGrid').style.display = 'grid';
-    // 隐藏商品列表区域
     document.getElementById('productsSection').style.display = 'none';
-    // 隐藏分类导航栏
     document.getElementById('categorySection').style.display = 'none';
-    // 重置当前分类
     currentCategory = 'all';
 };
 
 function getPromotionName(promo) {
     if (!promo) return '';
     return currentLang === 'fr' ? promo.name : (promo.name_zh || promo.name);
-}
-
-function getPromotionDescription(promo, applicableSubtotal) {
-    if (!promo) return '';
-    if (promo.type === 'discount' && promo.discount_percent) {
-        return `-${promo.discount_percent}%`;
-    } else if (promo.type === 'spend_reduce' && promo.min_amount && promo.reduce_amount) {
-        return `${promo.min_amount}€ → -${promo.reduce_amount}€`;
-    }
-    return '';
-}
-
-// 显示促销冲突弹窗
-function showPromotionConflictModal(existingPromo, newPromo, newDiscount, onKeepExisting, onUseNew) {
-    const existingName = getPromotionName(existingPromo);
-    const newName = getPromotionName(newPromo);
-    const t = translations[currentLang];
-    
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.6);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 10002;
-        backdrop-filter: blur(4px);
-    `;
-    
-    modal.innerHTML = `
-        <div style="background: white; border-radius: 24px; width: 340px; max-width: 85%; padding: 24px 20px; text-align: center;">
-            <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
-            <h3 style="color: #d97706; margin-bottom: 8px;">${t.promotionConflict}</h3>
-            <p style="color: #666; margin-bottom: 20px; font-size: 14px;">${t.cannotStack}</p>
-            <div style="background: #f1f5f9; border-radius: 16px; padding: 12px; margin-bottom: 12px; text-align: left;">
-                <div style="font-weight: 600; color: #1e293b;">① ${escapeHtml(existingName)}</div>
-                <div style="color: #10b981; font-size: 13px;">✓ ${t.discountApplied}</div>
-            </div>
-            <div style="background: #f1f5f9; border-radius: 16px; padding: 12px; margin-bottom: 20px; text-align: left;">
-                <div style="font-weight: 600; color: #1e293b;">② ${escapeHtml(newName)}</div>
-                <div style="color: #64748b; font-size: 13px;">-${formatPrice(newDiscount)}€</div>
-            </div>
-            <div style="display: flex; gap: 12px;">
-                <button id="keepExistingBtn" style="flex:1; background: #e2e8f0; color: #475569; border: none; padding: 12px; border-radius: 40px; font-weight: 600; cursor: pointer;">${t.keepExisting}</button>
-                <button id="useNewBtn" style="flex:1; background: #2f6d9e; color: white; border: none; padding: 12px; border-radius: 40px; font-weight: 600; cursor: pointer;">${t.useNew}</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    document.getElementById('keepExistingBtn').onclick = () => {
-        document.body.removeChild(modal);
-        if (onKeepExisting) onKeepExisting();
-    };
-    
-    document.getElementById('useNewBtn').onclick = () => {
-        document.body.removeChild(modal);
-        if (onUseNew) onUseNew();
-    };
 }
 
 // ========== 积分配置 ==========
@@ -397,7 +412,7 @@ function updatePromotionMarquee() {
     let texts = [];
     
     for (const p of activePromotions) {
-        const name = currentLang === 'fr' ? p.name : (p.name_zh || p.name);
+        const name = getPromotionName(p);
         
         if (p.type === 'discount') {
             texts.push(`${name} : -${p.discount_percent}%`);
@@ -408,8 +423,6 @@ function updatePromotionMarquee() {
                 if (Array.isArray(tiers)) {
                     texts.push(`${name} : ${tiers[0].min}€ → -${tiers[0].reduce}€`);
                 }
-            } else if (p.min_amount && p.reduce_amount) {
-                texts.push(`${name} : ${p.min_amount}€ → -${p.reduce_amount}€`);
             }
         }
         else if (p.type === 'points_multiplier') {
@@ -433,200 +446,6 @@ function updatePromotionMarquee() {
     content.innerHTML = `${t.promoMarquee} ${texts.join('  |  ')}`;
 }
 
-function calculateDiscounts(subtotal, couponDisc = 0, cartItems = null, couponPromo = null) {
-    if (!cartItems || cartItems.length === 0) {
-        return {
-            finalTotal: subtotal,
-            appliedPromotions: [],
-            appliedCoupon: null,
-            couponDiscount: 0,
-            buyNGetMDiscount: 0,
-            buyNGetMDetails: []
-        };
-    }
-    
-    // 计算普通商品小计（非促销商品）
-    let normalCurrentSubtotal = 0;
-    for (const item of cartItems) {
-        const product = products.find(p => p.id === item.id);
-        if (product && !product.is_promotion) {
-            const currentPrice = product.promotion_price || product.price;
-            normalCurrentSubtotal += currentPrice * item.quantity;
-        }
-    }
-    
-    // 1. 计算买N送M折扣
-    const buyNGetMResult = calculateBuyNGetMDiscount(cartItems, activePromotions);
-    let totalDiscount = buyNGetMResult.discount;
-    let appliedPromotions = [...buyNGetMResult.appliedPromotions];
-    
-    // 2. 计算其他自动促销（折扣、满减等）
-    let bestAutoPromo = null;
-    let bestAutoDiscount = 0;
-    
-    for (const promo of activePromotions) {
-        if (promo.need_coupon) continue;
-        if (promo.type === 'buy_n_get_m') continue; // 已经处理过了
-        
-        let discount = 0;
-        if (promo.type === 'discount' && promo.discount_percent) {
-            discount = normalCurrentSubtotal * promo.discount_percent / 100;
-        } else if (promo.type === 'spend_reduce' && promo.spend_reduce_tiers) {
-            // 满减多档处理
-            const tiers = typeof promo.spend_reduce_tiers === 'string' ? JSON.parse(promo.spend_reduce_tiers) : promo.spend_reduce_tiers;
-            if (Array.isArray(tiers)) {
-                for (let i = tiers.length - 1; i >= 0; i--) {
-                    if (normalCurrentSubtotal >= tiers[i].min) {
-                        discount = tiers[i].reduce;
-                        break;
-                    }
-                }
-            }
-        } else if (promo.type === 'free_shipping') {
-            discount = 0; // 免运费单独处理，不影响金额
-        }
-        
-        if (discount > bestAutoDiscount) {
-            bestAutoDiscount = discount;
-            bestAutoPromo = promo;
-        }
-    }
-    
-    if (bestAutoPromo && bestAutoDiscount > 0) {
-        // 检查是否可叠加
-        const autoStackable = bestAutoPromo.stackable === true;
-        if (autoStackable) {
-            totalDiscount += bestAutoDiscount;
-            appliedPromotions.push(bestAutoPromo);
-        } else if (bestAutoDiscount > totalDiscount) {
-            totalDiscount = bestAutoDiscount;
-            appliedPromotions = [bestAutoPromo];
-        }
-    }
-    
-    // 3. 处理优惠码折扣
-    let couponDiscountAmount = 0;
-    let bestCouponPromo = null;
-    
-    if (couponDisc > 0 && couponPromo) {
-        if (couponPromo.type === 'discount' && couponPromo.discount_percent) {
-            couponDiscountAmount = normalCurrentSubtotal * couponPromo.discount_percent / 100;
-        } else if (couponPromo.type === 'spend_reduce' && couponPromo.spend_reduce_tiers) {
-            const tiers = typeof couponPromo.spend_reduce_tiers === 'string' ? JSON.parse(couponPromo.spend_reduce_tiers) : couponPromo.spend_reduce_tiers;
-            if (Array.isArray(tiers)) {
-                for (let i = tiers.length - 1; i >= 0; i--) {
-                    if (normalCurrentSubtotal >= tiers[i].min) {
-                        couponDiscountAmount = tiers[i].reduce;
-                        break;
-                    }
-                }
-            }
-        } else if (couponPromo.type === 'free_shipping') {
-            couponDiscountAmount = 0;
-        }
-        bestCouponPromo = couponPromo;
-        
-        // 检查优惠码是否可叠加
-        const couponStackable = bestCouponPromo?.stackable === true;
-        if (couponStackable) {
-            totalDiscount += couponDiscountAmount;
-        } else if (couponDiscountAmount > totalDiscount) {
-            totalDiscount = couponDiscountAmount;
-            appliedPromotions = [bestCouponPromo];
-        }
-        // 否则保持原有折扣，优惠码不应用
-    }
-    
-    // 最终价格
-    const finalTotal = Math.max(0, normalCurrentSubtotal - totalDiscount);
-    
-    return {
-        finalTotal: finalTotal,
-        appliedPromotions: appliedPromotions,
-        appliedCoupon: bestCouponPromo,
-        couponDiscount: couponDiscountAmount,
-        buyNGetMDiscount: buyNGetMResult.discount,
-        buyNGetMDetails: buyNGetMResult.details
-    };
-}
-// ========== 买N送M促销计算 ==========
-function calculateBuyNGetMDiscount(cartItems, activePromotions) {
-    if (!cartItems || cartItems.length === 0) return { discount: 0, appliedPromotions: [], details: [] };
-    
-    let totalDiscount = 0;
-    const appliedPromotions = [];
-    const discountDetails = [];
-    const usedProductQuantities = new Map(); // 记录已经用于促销的商品数量
-    
-    // 筛选出买N送M类型的促销
-    const buyNGetMPromos = activePromotions.filter(p => p.type === 'buy_n_get_m' && !p.need_coupon);
-    
-    for (const promo of buyNGetMPromos) {
-        const buyN = promo.buy_n || 3;
-        const getM = promo.get_m || 1;
-        let promoDiscount = 0;
-        let promoApplied = false;
-        
-        // 遍历购物车中的每个商品
-        for (const item of cartItems) {
-            const product = products.find(p => p.id === item.id);
-            if (!product) continue;
-            
-            // 检查商品是否符合促销条件
-            let isApplicable = false;
-            
-            // 1. 检查适用商品（指定商品ID）
-            if (promo.applicable_products && promo.applicable_products.length > 0) {
-                if (promo.applicable_products.includes(item.id)) {
-                    isApplicable = true;
-                }
-            }
-            // 2. 检查适用分类
-            else if (promo.applicable_categories && promo.applicable_categories.length > 0) {
-                if (promo.applicable_categories.includes(product.category)) {
-                    isApplicable = true;
-                }
-            }
-            // 3. 没有指定分类和商品，全场适用
-            else {
-                isApplicable = true;
-            }
-            
-            if (!isApplicable) continue;
-            
-            // 获取当前商品已经使用的数量
-            const usedQty = usedProductQuantities.get(item.id) || 0;
-            const availableQty = item.quantity - usedQty;
-            if (availableQty < buyN) continue;
-            
-            // 计算可以享受多少次买N送M
-            const times = Math.floor(availableQty / buyN);
-            if (times > 0) {
-                const currentPrice = product.is_promotion && product.promotion_price ? product.promotion_price : product.price;
-                const freeValue = times * getM * currentPrice;
-                promoDiscount += freeValue;
-                promoApplied = true;
-                usedProductQuantities.set(item.id, usedQty + (times * buyN));
-                
-                discountDetails.push({
-                    productId: item.id,
-                    productName: currentLang === 'fr' ? product.name_fr : product.name_zh,
-                    buyN: buyN,
-                    getM: getM,
-                    times: times,
-                    discount: freeValue
-                });
-            }
-        }
-        
-        if (promoApplied && promoDiscount > 0) {
-            totalDiscount += promoDiscount;
-            appliedPromotions.push(promo);
-        }
-    }
-    
-    return { discount: totalDiscount, appliedPromotions, details: discountDetails };
-}
 function calculatePointsDiscount(subtotal, clientPoints) {
     if (!pointsConfig || !usePoints) return { discount: 0, usedPoints: 0 };
     const maxAmount = subtotal * (pointsConfig.max_redeem_percent / 100);
@@ -635,360 +454,7 @@ function calculatePointsDiscount(subtotal, clientPoints) {
     const usedPoints = Math.floor(discount / (pointsConfig.redeem_rate || 0.01));
     return { discount, usedPoints };
 }
-// ========== 下单 ==========
-async function showOrderModal() {
-    const t = translations[currentLang];
-    
-    // 先检查库存
-    for (const item of cart) {
-        const p = products.find(p => p.id === item.id);
-        if (p && item.quantity > (p.quantity || 0)) {
-            showToast(t.stockInsufficient, 'warning');
-            return;
-        }
-    }
-    
-    if (!currentClient) { 
-        showToast(t.loginNeeded, 'warning'); 
-        showAuthModal(); 
-        return; 
-    }
-    if (cart.length === 0) { 
-        showToast(t.emptyCart, 'warning'); 
-        return; 
-    }
-    
-    // 获取客户积分
-    const { data: fresh } = await window.supabase
-        .from('clients')
-        .select('points')
-        .eq('id', currentClient.id)
-        .single();
-    const clientPoints = fresh?.points || 0;
-    document.getElementById('pointsInfo').innerHTML = `${clientPoints} ${t.pointsAvailable}`;
-    
-    // 设置配送日期
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    document.getElementById('deliveryDate').min = tomorrow.toISOString().split('T')[0];
-    
-    // 计算小计和商品列表
-    let subtotal = 0;
-    let itemsHtml = '';
-    
-    for (const item of cart) {
-        const p = products.find(p => p.id === item.id);
-        if (!p) continue;
-        
-        const price = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
-        const originalPrice = p.price;
-        const itemTotal = price * item.quantity;
-        subtotal += itemTotal;
-        const name = currentLang === 'fr' ? p.name_fr : p.name_zh;
-        const hasDiscount = price < originalPrice;
-        
-        itemsHtml += `<div class="order-item">
-            <div class="order-item-name">
-                ${escapeHtml(name)} x ${item.quantity}
-                ${hasDiscount ? `<span class="order-item-original">(${formatPrice(originalPrice)} €)</span>` : ''}
-            </div>
-            <span class="order-item-price">${formatPrice(itemTotal)} €</span>
-        </div>`;
-    }
-    
-    // ========== 重新计算优惠码折扣 ==========
-    let couponDiscountAmount = 0;
-    let appliedCouponPromo = null;
-    
-    if (appliedCoupon) {
-        const couponPromo = activePromotions.find(p => p.need_coupon && p.coupon_code === appliedCoupon);
-        if (couponPromo) {
-            // 计算购物车小计用于优惠码
-            let cartSubtotalForCoupon = 0;
-            for (const item of cart) {
-                const p = products.find(prod => prod.id === item.id);
-                if (p) {
-                    const price = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
-                    cartSubtotalForCoupon += price * item.quantity;
-                }
-            }
-            
-            // 根据促销类型计算折扣
-            if (couponPromo.type === 'discount' && couponPromo.discount_percent) {
-                couponDiscountAmount = cartSubtotalForCoupon * couponPromo.discount_percent / 100;
-                appliedCouponPromo = couponPromo;
-            } 
-            else if (couponPromo.type === 'spend_reduce') {
-                if (couponPromo.spend_reduce_tiers) {
-                    const tiers = typeof couponPromo.spend_reduce_tiers === 'string' ? JSON.parse(couponPromo.spend_reduce_tiers) : couponPromo.spend_reduce_tiers;
-                    if (Array.isArray(tiers)) {
-                        for (let i = tiers.length - 1; i >= 0; i--) {
-                            if (cartSubtotalForCoupon >= tiers[i].min) {
-                                couponDiscountAmount = tiers[i].reduce;
-                                appliedCouponPromo = couponPromo;
-                                break;
-                            }
-                        }
-                    }
-                } else if (couponPromo.min_amount && cartSubtotalForCoupon >= couponPromo.min_amount) {
-                    couponDiscountAmount = couponPromo.reduce_amount || 0;
-                    appliedCouponPromo = couponPromo;
-                }
-            }
-            else if (couponPromo.type === 'buy_n_get_m') {
-                // 买N送M类型
-                const buyN = couponPromo.buy_n || 3;
-                const getM = couponPromo.get_m || 1;
-                for (const item of cart) {
-                    const p = products.find(prod => prod.id === item.id);
-                    if (!p) continue;
-                    
-                    let isApplicable = false;
-                    if (couponPromo.applicable_products && couponPromo.applicable_products.length > 0) {
-                        if (couponPromo.applicable_products.includes(item.id)) isApplicable = true;
-                    } else if (couponPromo.applicable_categories && couponPromo.applicable_categories.length > 0) {
-                        if (couponPromo.applicable_categories.includes(p.category)) isApplicable = true;
-                    } else {
-                        isApplicable = true;
-                    }
-                    
-                    if (isApplicable && item.quantity >= buyN) {
-                        const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
-                        const freeValue = Math.floor(item.quantity / buyN) * getM * currentPrice;
-                        couponDiscountAmount += freeValue;
-                        appliedCouponPromo = couponPromo;
-                    }
-                }
-            }
-        }
-        // 更新全局变量
-        couponDiscount = couponDiscountAmount;
-    }
-    
-    // ========== 计算自动促销折扣 ==========
-    let autoPromoDiscount = 0;
-    let autoPromo = null;
-    
-    for (const promo of activePromotions) {
-        if (promo.need_coupon) continue;
-        if (promo.type === 'buy_n_get_m') {
-            // 买N送M促销
-            const buyN = promo.buy_n || 3;
-            const getM = promo.get_m || 1;
-            let promoDiscount = 0;
-            for (const item of cart) {
-                const p = products.find(prod => prod.id === item.id);
-                if (!p) continue;
-                
-                let isApplicable = false;
-                if (promo.applicable_products && promo.applicable_products.length > 0) {
-                    if (promo.applicable_products.includes(item.id)) isApplicable = true;
-                } else if (promo.applicable_categories && promo.applicable_categories.length > 0) {
-                    if (promo.applicable_categories.includes(p.category)) isApplicable = true;
-                } else {
-                    isApplicable = true;
-                }
-                
-                if (isApplicable && item.quantity >= buyN) {
-                    const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
-                    const freeValue = Math.floor(item.quantity / buyN) * getM * currentPrice;
-                    promoDiscount += freeValue;
-                }
-            }
-            if (promoDiscount > autoPromoDiscount) {
-                autoPromoDiscount = promoDiscount;
-                autoPromo = promo;
-            }
-        }
-        else if (promo.type === 'discount' && promo.discount_percent) {
-            let normalSubtotal = 0;
-            for (const item of cart) {
-                const p = products.find(prod => prod.id === item.id);
-                if (p && !p.is_promotion) {
-                    normalSubtotal += p.price * item.quantity;
-                }
-            }
-            const discount = normalSubtotal * promo.discount_percent / 100;
-            if (discount > autoPromoDiscount) {
-                autoPromoDiscount = discount;
-                autoPromo = promo;
-            }
-        }
-        else if (promo.type === 'spend_reduce' && promo.spend_reduce_tiers) {
-            let normalSubtotal = 0;
-            for (const item of cart) {
-                const p = products.find(prod => prod.id === item.id);
-                if (p && !p.is_promotion) {
-                    normalSubtotal += p.price * item.quantity;
-                }
-            }
-            const tiers = typeof promo.spend_reduce_tiers === 'string' ? JSON.parse(promo.spend_reduce_tiers) : promo.spend_reduce_tiers;
-            if (Array.isArray(tiers)) {
-                for (let i = tiers.length - 1; i >= 0; i--) {
-                    if (normalSubtotal >= tiers[i].min) {
-                        const discount = tiers[i].reduce;
-                        if (discount > autoPromoDiscount) {
-                            autoPromoDiscount = discount;
-                            autoPromo = promo;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    
-    // ========== 处理折扣叠加 ==========
-    let totalDiscount = 0;
-    let finalAppliedPromotions = [];
-    let finalAppliedCoupon = null;
-    
-    // 检查是否可叠加
-    const autoStackable = autoPromo?.stackable === true;
-    const couponStackable = appliedCouponPromo?.stackable === true;
-    
-    if (autoPromoDiscount > 0 && couponDiscountAmount > 0) {
-        if (autoStackable && couponStackable) {
-            // 都叠加
-            totalDiscount = autoPromoDiscount + couponDiscountAmount;
-            finalAppliedPromotions = [autoPromo];
-            finalAppliedCoupon = appliedCouponPromo;
-        } else if (autoStackable && !couponStackable) {
-            totalDiscount = couponDiscountAmount;
-            finalAppliedCoupon = appliedCouponPromo;
-        } else if (!autoStackable && couponStackable) {
-            totalDiscount = autoPromoDiscount;
-            finalAppliedPromotions = [autoPromo];
-        } else {
-            // 都不叠加，取大的
-            if (autoPromoDiscount >= couponDiscountAmount) {
-                totalDiscount = autoPromoDiscount;
-                finalAppliedPromotions = [autoPromo];
-            } else {
-                totalDiscount = couponDiscountAmount;
-                finalAppliedCoupon = appliedCouponPromo;
-            }
-        }
-    } else if (autoPromoDiscount > 0) {
-        totalDiscount = autoPromoDiscount;
-        finalAppliedPromotions = [autoPromo];
-    } else if (couponDiscountAmount > 0) {
-        totalDiscount = couponDiscountAmount;
-        finalAppliedCoupon = appliedCouponPromo;
-    }
-    
-    const finalTotal = subtotal - totalDiscount;
-    
-    // ========== 积分抵扣 ==========
-    const { discount: ptsDisc, usedPoints } = calculatePointsDiscount(finalTotal, clientPoints);
-    pointsDiscount = usePoints ? ptsDisc : 0;
-    pointsToUse = usedPoints;
-    const finalTotalWithPoints = finalTotal - pointsDiscount;
-    
-    // ========== 构建订单HTML ==========
-    let orderHtml = itemsHtml;
-    orderHtml += `<div class="order-divider"></div>`;
-    
-    // 小计
-    orderHtml += `<div class="order-item order-subtotal">
-        <span>${t.subtotal}</span>
-        <span>${formatPrice(subtotal)} €</span>
-    </div>`;
-    
-    // 自动促销折扣
-    for (const promo of finalAppliedPromotions) {
-        let promoDiscountDisplay = 0;
-        if (promo.type === 'buy_n_get_m') {
-            const buyN = promo.buy_n || 3;
-            const getM = promo.get_m || 1;
-            promoDiscountDisplay = autoPromoDiscount;
-            orderHtml += `<div class="order-item order-discount">
-                <span>🎁 ${getPromotionName(promo)} (${buyN}→+${getM})</span>
-                <span style="color:#10b981;">-${formatPrice(promoDiscountDisplay)} €</span>
-            </div>`;
-        } else if (promo.type === 'discount') {
-            promoDiscountDisplay = autoPromoDiscount;
-            orderHtml += `<div class="order-item order-discount">
-                <span>🏷️ ${getPromotionName(promo)} (-${promo.discount_percent}%)</span>
-                <span style="color:#10b981;">-${formatPrice(promoDiscountDisplay)} €</span>
-            </div>`;
-        } else if (promo.type === 'spend_reduce') {
-            promoDiscountDisplay = autoPromoDiscount;
-            orderHtml += `<div class="order-item order-discount">
-                <span>🏷️ ${getPromotionName(promo)}</span>
-                <span style="color:#10b981;">-${formatPrice(promoDiscountDisplay)} €</span>
-            </div>`;
-        }
-    }
-    
-    // 优惠码折扣
-    if (finalAppliedCoupon && couponDiscountAmount > 0) {
-        orderHtml += `<div class="order-item order-discount">
-            <span>🎫 ${getPromotionName(finalAppliedCoupon)} (${escapeHtml(appliedCoupon)})</span>
-            <span style="color:#10b981;">-${formatPrice(couponDiscountAmount)} €</span>
-        </div>`;
-    }
-    
-    // 积分抵扣
-    if (pointsDiscount > 0) {
-        orderHtml += `<div class="order-item order-discount">
-            <span>⭐ ${t.pointsRedeem} (${pointsToUse} pts)</span>
-            <span style="color:#10b981;">-${formatPrice(pointsDiscount)} €</span>
-        </div>`;
-    }
-    
-    // 合计
-    orderHtml += `<div class="order-item order-total">
-        <span>${t.finalAmount}</span>
-        <span>${formatPrice(finalTotalWithPoints)} €</span>
-    </div>`;
-    
-    // 预计获得积分
-    const expectedPoints = calculatePointsEarned(finalTotalWithPoints);
-    if (expectedPoints > 0) {
-        orderHtml += `<div class="order-item order-points">
-            <span>⭐ ${t.pointsWillEarn}</span>
-            <span>${expectedPoints} ${t.pointsAfterConfirm}</span>
-        </div>`;
-    }
-    
-    document.getElementById('orderItems').innerHTML = orderHtml;
-    document.getElementById('orderTotalAmount').textContent = `${formatPrice(finalTotalWithPoints)} €`;
-    document.getElementById('orderModal').classList.add('active');
-    
-    // 积分复选框
-    const pointsCheck = document.getElementById('usePointsCheckbox');
-    if (pointsCheck) {
-        pointsCheck.checked = usePoints;
-        pointsCheck.onchange = async (e) => { 
-            usePoints = e.target.checked; 
-            await showOrderModal(); 
-        };
-    }
-    
-    // 优惠码按钮
-    const applyBtn = document.getElementById('applyCouponBtn');
-    if (applyBtn) {
-        const newBtn = applyBtn.cloneNode(true);
-        applyBtn.parentNode.replaceChild(newBtn, applyBtn);
-        newBtn.onclick = async () => {
-            const code = document.getElementById('couponCodeInput').value.trim();
-            if (!code) return;
-            
-            const res = await applyCouponCode(code);
-            const msgDiv = document.getElementById('couponMessage');
-            
-            if (res.success) {
-                appliedCoupon = code;
-                couponDiscount = res.discount;
-                msgDiv.innerHTML = `<span style="color:#10b981;">✅ ${res.discount.toFixed(2)}€ appliqué</span>`;
-                await showOrderModal();
-            } else {
-                msgDiv.innerHTML = `<span style="color:#dc2626;">❌ ${res.message}</span>`;
-            }
-        };
-    }
-}
+
 function calculatePointsEarned(orderAmount) {
     if (!pointsConfig) return 0;
     let multiplier = 1;
@@ -1001,8 +467,292 @@ function calculatePointsEarned(orderAmount) {
     return Math.floor(orderAmount * (pointsConfig.exchange_rate || 10) * multiplier);
 }
 
+// ========== 辅助函数 ==========
+function calculateNormalSubtotal() {
+    let normalSubtotal = 0;
+    for (const item of cart) {
+        const p = products.find(prod => prod.id === item.id);
+        if (p && !p.is_promotion) {
+            normalSubtotal += p.price * item.quantity;
+        }
+    }
+    return normalSubtotal;
+}
+
+// 获取所有可用自动优惠及其折扣
+// 获取所有可用自动优惠及其折扣
+function getAllAvailablePromosWithDiscount() {
+    const results = [];
+    
+    for (const promo of activePromotions) {
+        if (promo.need_coupon) continue;
+        
+        let discount = 0;
+        let detailInfo = null;
+        
+        // 检查商品是否适用该促销
+        function isItemApplicable(item, product) {
+            // 没有指定任何限制，全场适用
+            if ((!promo.applicable_products || promo.applicable_products.length === 0) && 
+                (!promo.applicable_categories || promo.applicable_categories.length === 0)) {
+                return true;
+            }
+            // 检查适用商品
+            if (promo.applicable_products && promo.applicable_products.length > 0) {
+                return promo.applicable_products.includes(item.id);
+            }
+            // 检查适用分类
+            if (promo.applicable_categories && promo.applicable_categories.length > 0) {
+                return promo.applicable_categories.includes(product.category);
+            }
+            return false;
+        }
+        
+        if (promo.type === 'buy_n_get_m') {
+            const buyN = promo.buy_n || 3;
+            const getM = promo.get_m || 1;
+            let promoDiscount = 0;
+            const promoDetails = [];
+            const usedQuantities = new Map();
+            
+            for (const item of cart) {
+                const p = products.find(prod => prod.id === item.id);
+                if (!p) continue;
+                if (!isItemApplicable(item, p)) continue;
+                
+                const usedQty = usedQuantities.get(item.id) || 0;
+                const availableQty = item.quantity - usedQty;
+                if (availableQty < buyN) continue;
+                
+                const times = Math.floor(availableQty / buyN);
+                if (times > 0) {
+                    const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
+                    const freeValue = times * getM * currentPrice;
+                    promoDiscount += freeValue;
+                    usedQuantities.set(item.id, usedQty + (times * buyN));
+                    
+                    promoDetails.push({
+                        productName: currentLang === 'fr' ? p.name_fr : p.name_zh,
+                        buyN: buyN,
+                        getM: getM,
+                        times: times,
+                        discount: freeValue
+                    });
+                }
+            }
+            
+            if (promoDiscount > 0) {
+                discount = promoDiscount;
+                detailInfo = { type: 'buy_n_get_m', details: promoDetails };
+            }
+        }
+        else if (promo.type === 'discount' && promo.discount_percent) {
+            let applicableSubtotal = 0;
+            
+            for (const item of cart) {
+                const p = products.find(prod => prod.id === item.id);
+                if (!p) continue;
+                if (!isItemApplicable(item, p)) continue;
+                
+                const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
+                applicableSubtotal += currentPrice * item.quantity;
+            }
+            
+            discount = applicableSubtotal * promo.discount_percent / 100;
+            if (discount > 0) {
+                detailInfo = { type: 'discount', percent: promo.discount_percent };
+            }
+        }
+        else if (promo.type === 'spend_reduce') {
+            let applicableSubtotal = 0;
+            
+            for (const item of cart) {
+                const p = products.find(prod => prod.id === item.id);
+                if (!p) continue;
+                if (!isItemApplicable(item, p)) continue;
+                
+                const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
+                applicableSubtotal += currentPrice * item.quantity;
+            }
+            
+            if (promo.spend_reduce_tiers) {
+                const tiers = typeof promo.spend_reduce_tiers === 'string' 
+                    ? JSON.parse(promo.spend_reduce_tiers) 
+                    : promo.spend_reduce_tiers;
+                if (Array.isArray(tiers)) {
+                    for (let i = tiers.length - 1; i >= 0; i--) {
+                        if (applicableSubtotal >= tiers[i].min) {
+                            discount = tiers[i].reduce;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (discount > 0) {
+                detailInfo = { type: 'spend_reduce' };
+            }
+        }
+        
+        if (discount > 0) {
+            results.push({ promo, discount, detailInfo });
+        }
+    }
+    
+    return results;
+}
+
+// 计算最优组合
+function calculateOptimalPromoCombination(allPromos) {
+    const stackablePromos = [];
+    const nonStackablePromos = [];
+    
+    for (const item of allPromos) {
+        if (item.promo.stackable === true) {
+            stackablePromos.push(item);
+        } else {
+            nonStackablePromos.push(item);
+        }
+    }
+    
+    // 可叠加：全部累加
+    let stackableTotal = 0;
+    for (const item of stackablePromos) {
+        stackableTotal += item.discount;
+    }
+    
+    // 不可叠加：取最大值
+    let nonStackableMax = 0;
+    let bestNonStackable = null;
+    for (const item of nonStackablePromos) {
+        if (item.discount > nonStackableMax) {
+            nonStackableMax = item.discount;
+            bestNonStackable = item;
+        }
+    }
+    
+    if (stackableTotal >= nonStackableMax) {
+        return { selectedPromos: stackablePromos, totalDiscount: stackableTotal };
+    } else {
+        return { selectedPromos: bestNonStackable ? [bestNonStackable] : [], totalDiscount: nonStackableMax };
+    }
+}
+
+// 检查某个促销是否与当前已选促销兼容
+function isPromoCompatibleWithSelected(promo, selectedPromos) {
+    if (promo.stackable === true) {
+        // 可叠加的促销：检查是否与任何不可叠加的已选促销冲突
+        const hasNonStackableSelected = selectedPromos.some(p => p.promo.stackable !== true);
+        return !hasNonStackableSelected;
+    } else {
+        // 不可叠加的促销：只能单独存在
+        return selectedPromos.length === 0;
+    }
+}
+
+// 检查优惠码是否与当前自动优惠兼容
+function isCouponCompatibleWithAutoPromos(couponPromo) {
+    if (couponPromo.stackable === true) {
+        // 可叠加的优惠码：检查是否有不可叠加的自动优惠
+        const hasNonStackableAuto = currentAutoPromotions.some(p => p.promo.stackable !== true);
+        return !hasNonStackableAuto;
+    } else {
+        // 不可叠加的优惠码：只能在没有自动优惠时使用
+        return currentAutoPromotions.length === 0;
+    }
+}
+
+// 计算优惠码折扣
+// 计算优惠码折扣
+function calculateCouponDiscountAmount(couponPromo) {
+    if (!couponPromo) return 0;
+    
+    let discount = 0;
+    
+    // 检查商品是否适用该优惠码
+    function isItemApplicable(item, product) {
+        // 没有指定任何限制，全场适用
+        if ((!couponPromo.applicable_products || couponPromo.applicable_products.length === 0) && 
+            (!couponPromo.applicable_categories || couponPromo.applicable_categories.length === 0)) {
+            return true;
+        }
+        // 检查适用商品
+        if (couponPromo.applicable_products && couponPromo.applicable_products.length > 0) {
+            return couponPromo.applicable_products.includes(item.id);
+        }
+        // 检查适用分类
+        if (couponPromo.applicable_categories && couponPromo.applicable_categories.length > 0) {
+            return couponPromo.applicable_categories.includes(product.category);
+        }
+        return false;
+    }
+    
+    if (couponPromo.type === 'discount' && couponPromo.discount_percent) {
+        let applicableSubtotal = 0;
+        
+        for (const item of cart) {
+            const p = products.find(prod => prod.id === item.id);
+            if (!p) continue;
+            if (!isItemApplicable(item, p)) continue;
+            
+            const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
+            applicableSubtotal += currentPrice * item.quantity;
+        }
+        
+        discount = applicableSubtotal * couponPromo.discount_percent / 100;
+    } 
+    else if (couponPromo.type === 'spend_reduce') {
+        let applicableSubtotal = 0;
+        
+        for (const item of cart) {
+            const p = products.find(prod => prod.id === item.id);
+            if (!p) continue;
+            if (!isItemApplicable(item, p)) continue;
+            
+            const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
+            applicableSubtotal += currentPrice * item.quantity;
+        }
+        
+        if (couponPromo.spend_reduce_tiers) {
+            const tiers = typeof couponPromo.spend_reduce_tiers === 'string' 
+                ? JSON.parse(couponPromo.spend_reduce_tiers) 
+                : couponPromo.spend_reduce_tiers;
+            if (Array.isArray(tiers)) {
+                for (let i = tiers.length - 1; i >= 0; i--) {
+                    if (applicableSubtotal >= tiers[i].min) {
+                        discount = tiers[i].reduce;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    else if (couponPromo.type === 'buy_n_get_m') {
+        const buyN = couponPromo.buy_n || 3;
+        const getM = couponPromo.get_m || 1;
+        const usedQuantities = new Map();
+        
+        for (const item of cart) {
+            const p = products.find(prod => prod.id === item.id);
+            if (!p) continue;
+            if (!isItemApplicable(item, p)) continue;
+            
+            const usedQty = usedQuantities.get(item.id) || 0;
+            const availableQty = item.quantity - usedQty;
+            if (availableQty < buyN) continue;
+            
+            const times = Math.floor(availableQty / buyN);
+            if (times > 0) {
+                const currentPrice = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
+                discount += times * getM * currentPrice;
+                usedQuantities.set(item.id, usedQty + (times * buyN));
+            }
+        }
+    }
+    
+    return discount;
+}
 // ========== 优惠码 ==========
-async function applyCouponCode(code, subtotal) {
+async function applyCouponCode(code) {
     if (!code) return { success: false, discount: 0, message: '' };
     
     const promo = activePromotions.find(p => p.need_coupon && p.coupon_code && p.coupon_code.toUpperCase() === code.toUpperCase());
@@ -1012,87 +762,8 @@ async function applyCouponCode(code, subtotal) {
         return { success: false, discount: 0, message: currentLang === 'fr' ? 'Code expiré' : '优惠码已用完' };
     }
     
-    // 计算购物车小计（所有商品，包括促销商品）
-    let cartSubtotal = 0;
-    for (const item of cart) {
-        const product = products.find(p => p.id === item.id);
-        if (product) {
-            const currentPrice = product.is_promotion && product.promotion_price ? product.promotion_price : product.price;
-            cartSubtotal += currentPrice * item.quantity;
-        }
-    }
-    
-    let discount = 0;
-    let discountApplied = false;
-    
-    // 根据促销类型计算折扣
-    if (promo.type === 'discount' && promo.discount_percent) {
-        discount = cartSubtotal * promo.discount_percent / 100;
-        discountApplied = true;
-    } 
-    else if (promo.type === 'spend_reduce') {
-        // 满减多档处理
-        if (promo.spend_reduce_tiers) {
-            const tiers = typeof promo.spend_reduce_tiers === 'string' ? JSON.parse(promo.spend_reduce_tiers) : promo.spend_reduce_tiers;
-            if (Array.isArray(tiers)) {
-                for (let i = tiers.length - 1; i >= 0; i--) {
-                    if (cartSubtotal >= tiers[i].min) {
-                        discount = tiers[i].reduce;
-                        discountApplied = true;
-                        break;
-                    }
-                }
-            }
-        }
-        // 兼容旧格式
-        else if (promo.min_amount && cartSubtotal >= promo.min_amount) {
-            discount = promo.reduce_amount || 0;
-            discountApplied = true;
-        }
-    }
-    else if (promo.type === 'buy_n_get_m') {
-        // 买N送M类型：需要在购物车中检查是否有符合条件的商品
-        const buyN = promo.buy_n || 3;
-        const getM = promo.get_m || 1;
-        
-        // 遍历购物车中的每个商品
-        for (const item of cart) {
-            const product = products.find(p => p.id === item.id);
-            if (!product) continue;
-            
-            // 检查商品是否符合条件
-            let isApplicable = false;
-            
-            // 检查适用商品
-            if (promo.applicable_products && promo.applicable_products.length > 0) {
-                if (promo.applicable_products.includes(item.id)) isApplicable = true;
-            }
-            // 检查适用分类
-            else if (promo.applicable_categories && promo.applicable_categories.length > 0) {
-                if (promo.applicable_categories.includes(product.category)) isApplicable = true;
-            }
-            else {
-                isApplicable = true;
-            }
-            
-            if (isApplicable && item.quantity >= buyN) {
-                const currentPrice = product.is_promotion && product.promotion_price ? product.promotion_price : product.price;
-                const freeValue = Math.floor(item.quantity / buyN) * getM * currentPrice;
-                discount += freeValue;
-                discountApplied = true;
-            }
-        }
-    }
-    else if (promo.type === 'free_shipping') {
-        discount = 0;
-        discountApplied = true;
-    }
-    else if (promo.type === 'points_multiplier') {
-        discount = 0;
-        discountApplied = true;
-    }
-    
-    if (!discountApplied || discount <= 0) {
+    const discount = calculateCouponDiscountAmount(promo);
+    if (discount <= 0) {
         return { success: false, discount: 0, message: currentLang === 'fr' ? 'Non applicable' : '不适用' };
     }
     
@@ -1103,7 +774,6 @@ async function applyCouponCode(code, subtotal) {
 function loadCart() {
     const saved = localStorage.getItem('yida_cart');
     cart = saved ? JSON.parse(saved) : [];
-    // 确保购物车中的商品数量不超过库存
     for (let i = 0; i < cart.length; i++) {
         const product = products.find(p => p.id === cart[i].id);
         if (product && cart[i].quantity > (product.quantity || 0)) {
@@ -1111,13 +781,13 @@ function loadCart() {
         }
     }
     updateCartUI();
-    renderProducts();  // 添加这一行
+    renderProducts();
 }
 
 function saveCart() {
     localStorage.setItem('yida_cart', JSON.stringify(cart));
     updateCartUI();
-    renderProducts();  // 添加这一行，刷新商品列表上的数量显示
+    renderProducts();
 }
 
 function updateCartUI() {
@@ -1140,9 +810,6 @@ function updateCartUI() {
     if (cart.length === 0) {
         container.innerHTML = `<div class="empty-cart"><p>${translations[currentLang].emptyCart}</p></div>`;
         totalSpan.textContent = '0.00 €';
-        // 清空折扣标签
-        const discountTagsContainer = document.getElementById('discountTags');
-        if (discountTagsContainer) discountTagsContainer.innerHTML = '';
         return;
     }
     
@@ -1181,56 +848,9 @@ function updateCartUI() {
     
     container.innerHTML = html;
     originalSubtotal = subtotal;
-    
-    // 计算折扣并显示
-    const discountResult = calculateDiscounts(subtotal, couponDiscount, cart, null);
-    const finalTotal = discountResult.finalTotal;
-    totalSpan.innerHTML = `${formatPrice(finalTotal)} €`;
-    
-    // 显示折扣标签
-    const discountTagsContainer = document.getElementById('discountTags');
-    if (discountTagsContainer) {
-        let tagsHtml = '';
-        const t = translations[currentLang];
-        
-        // 买N送M折扣标签
-        for (const detail of discountResult.buyNGetMDetails) {
-            tagsHtml += `<div class="discount-tag">
-                🎁 ${escapeHtml(detail.productName)}: ${t.buyNGetMPromo || 'Achetez'} ${detail.buyN} = ${detail.getM} ${t.free || 'gratuit'} (${detail.times}x, -${formatPrice(detail.discount)}€)
-                <button class="remove-discount" onclick="removeBuyNGetMPromotion()">✕</button>
-            </div>`;
-        }
-        
-        // 其他促销折扣标签
-        for (const promo of discountResult.appliedPromotions) {
-            if (promo.type !== 'buy_n_get_m') {
-                let promoText = '';
-                if (promo.type === 'discount') {
-                    promoText = `${getPromotionName(promo)}: -${promo.discount_percent}%`;
-                } else if (promo.type === 'spend_reduce') {
-                    promoText = `${getPromotionName(promo)}: Réduction`;
-                } else {
-                    promoText = getPromotionName(promo);
-                }
-                tagsHtml += `<div class="discount-tag">
-                    🏷️ ${escapeHtml(promoText)}
-                    <button class="remove-discount" onclick="removePromotion('${promo.id}')">✕</button>
-                </div>`;
-            }
-        }
-        
-        // 优惠码标签
-        if (discountResult.appliedCoupon && discountResult.couponDiscount > 0) {
-            tagsHtml += `<div class="discount-tag">
-                🎫 ${getPromotionName(discountResult.appliedCoupon)}
-                <button class="remove-discount" onclick="removeCoupon()">✕</button>
-            </div>`;
-        }
-        
-        discountTagsContainer.innerHTML = tagsHtml;
-    }
+    totalSpan.innerHTML = `${formatPrice(subtotal)} €`;
 }
-// 购物车中加减数量
+
 window.updateCartItemQuantity = function(id, delta) {
     const item = cart.find(i => i.id === id);
     if (!item) return;
@@ -1254,14 +874,9 @@ window.updateCartItemQuantity = function(id, delta) {
     }
     
     saveCart();
-    renderProducts();  // 刷新商品列表（同步显示数量）
+    renderProducts();
 };
-// 移除买N送M促销（清空所有买N送M折扣）
-window.removeBuyNGetMPromotion = function() {
-    // 买N送M促销无法单独移除，需要清空所有促销
-    showToast('Les promotions buy N get M sont automatiques', 'info');
-};
-// 购物车中直接输入数量
+
 window.updateCartItemQuantityDirect = function(id, newQty) {
     const product = products.find(p => p.id === id);
     if (!product) return;
@@ -1275,7 +890,6 @@ window.updateCartItemQuantityDirect = function(id, newQty) {
     if (quantity > stock) {
         showToast(t.stockInsufficient, 'warning');
         quantity = stock;
-        // 修正输入框的值
         const inputEl = document.getElementById(`cart_qty_input_${id}`);
         if (inputEl) inputEl.value = quantity;
     }
@@ -1292,52 +906,9 @@ window.updateCartItemQuantityDirect = function(id, newQty) {
     }
     
     saveCart();
-    renderProducts();  // 刷新商品列表（同步显示数量）
+    renderProducts();
 };
 
-// 移除促销
-window.removePromotion = function(promoId) {
-    // 从数组中移除该促销
-    currentAppliedPromotions = currentAppliedPromotions.filter(p => p.id !== promoId);
-    updateCartUI();
-    showToast('Promotion supprimée', 'success');
-};
-
-// 移除优惠码
-window.removeCoupon = function() {
-    appliedCoupon = null;
-    couponDiscount = 0;
-    document.getElementById('couponCodeInput').value = '';
-    document.getElementById('couponMessage').innerHTML = '';
-    updateCartUI();
-    showToast('Code promo supprimé', 'success');
-};
-
-window.updateCartItem = function(id, delta) {
-    const item = cart.find(i => i.id === id);
-    if (!item) return;
-    
-    const product = products.find(p => p.id === id);
-    if (!product) return;
-    
-    const productStock = product.quantity || 0;
-    const newQuantity = item.quantity + delta;
-    const t = translations[currentLang];
-    
-    // 增加数量时检查库存
-    if (delta > 0 && newQuantity > productStock) {
-        showToast(t.stockInsufficient, 'warning');
-        return;
-    }
-    
-    // 减少数量或移除
-    if (newQuantity <= 0) {
-        cart = cart.filter(i => i.id !== id);
-    } else {
-        item.quantity = newQuantity;
-    }
-    saveCart();
-};
 window.removeCartItem = function(id) {
     cart = cart.filter(i => i.id !== id);
     saveCart();
@@ -1368,21 +939,18 @@ function addToCart(product) {
     showToast(t.addToCart, 'success');
 }
 
-
 async function loadProducts() {
     try {
         const { data } = await window.supabase.from('products').select('*');
         products = data || [];
         products.sort((a, b) => (a.is_promotion === b.is_promotion) ? 0 : a.is_promotion ? -1 : 1);
         renderProducts();
-        // 商品加载完成后，刷新购物车显示
         updateCartUI();
     } catch (err) {
         document.getElementById('productsGrid').innerHTML = '<div class="loading-state"><p>❌ Erreur</p></div>';
     }
 }
-// 更新商品数量（从商品列表直接操作）
-// 更新商品数量（加减按钮）
+
 window.updateProductQuantity = function(productId, delta) {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -1411,10 +979,10 @@ window.updateProductQuantity = function(productId, delta) {
     }
     
     saveCart();
-    renderProducts();  // 刷新商品列表
-    updateCartUI();    // 刷新购物车侧边栏
+    renderProducts();
+    updateCartUI();
 };
-// 直接设置商品数量（输入框变化时调用）
+
 window.updateProductQuantityDirect = function(productId, newQty) {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -1423,7 +991,6 @@ window.updateProductQuantityDirect = function(productId, newQty) {
     let quantity = parseInt(newQty);
     const t = translations[currentLang];
     
-    // 验证输入
     if (isNaN(quantity)) quantity = 0;
     if (quantity < 0) quantity = 0;
     if (quantity > stock) {
@@ -1442,10 +1009,10 @@ window.updateProductQuantityDirect = function(productId, newQty) {
     }
     
     saveCart();
-    renderProducts();  // 刷新商品列表
-    updateCartUI();    // 刷新购物车侧边栏
+    renderProducts();
+    updateCartUI();
 };
-// 从购物车移除商品
+
 window.removeFromCart = function(productId) {
     cart = cart.filter(i => i.id !== productId);
     saveCart();
@@ -1453,6 +1020,7 @@ window.removeFromCart = function(productId) {
     updateCartUI();
     showToast(translations[currentLang].remove, 'success');
 };
+
 function renderProducts() {
     let filtered = products;
     if (currentCategory === 'promotion') {
@@ -1477,7 +1045,6 @@ function renderProducts() {
         const stock = product.quantity || 0;
         const isOutOfStock = stock <= 0;
         
-        // 获取当前购物车中该商品的数量
         const cartItem = cart.find(i => i.id === product.id);
         const cartQty = cartItem ? cartItem.quantity : 0;
         const canIncrease = cartQty < stock;
@@ -1528,6 +1095,7 @@ function renderProducts() {
     
     document.getElementById('productsGrid').innerHTML = html;
 }
+
 // ========== 认证 ==========
 function showAuthModal() { document.getElementById('authModal').classList.add('active'); }
 function hideAuthModal() { document.getElementById('authModal').classList.remove('active'); }
@@ -1591,15 +1159,398 @@ function updateAuthUI() {
     }
 }
 
+// ========== showOrderModal ==========
+async function showOrderModal() {
+    const t = translations[currentLang];
+    
+    for (const item of cart) {
+        const p = products.find(p => p.id === item.id);
+        if (p && item.quantity > (p.quantity || 0)) {
+            showToast(t.stockInsufficient, 'warning');
+            return;
+        }
+    }
+    
+    if (!currentClient) { 
+        showToast(t.loginNeeded, 'warning'); 
+        showAuthModal(); 
+        return; 
+    }
+    if (cart.length === 0) { 
+        showToast(t.emptyCart, 'warning'); 
+        return; 
+    }
+    
+    const { data: fresh } = await window.supabase
+        .from('clients')
+        .select('points')
+        .eq('id', currentClient.id)
+        .single();
+    const clientPoints = fresh?.points || 0;
+    document.getElementById('pointsInfo').innerHTML = `${clientPoints} ${t.pointsAvailable}`;
+    
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('deliveryDate').min = tomorrow.toISOString().split('T')[0];
+    
+    let subtotal = 0;
+    let itemsHtml = '';
+    
+    for (const item of cart) {
+        const p = products.find(p => p.id === item.id);
+        if (!p) continue;
+        
+        const price = p.is_promotion && p.promotion_price ? p.promotion_price : p.price;
+        const originalPrice = p.price;
+        const itemTotal = price * item.quantity;
+        subtotal += itemTotal;
+        const name = currentLang === 'fr' ? p.name_fr : p.name_zh;
+        const hasDiscount = price < originalPrice;
+        
+        itemsHtml += `<div class="order-item">
+            <div class="order-item-name">
+                ${escapeHtml(name)} x ${item.quantity}
+                ${hasDiscount ? `<span class="order-item-original">(${formatPrice(originalPrice)} €)</span>` : ''}
+            </div>
+            <span class="order-item-price">${formatPrice(itemTotal)} €</span>
+        </div>`;
+    }
+    
+    // 获取所有可用自动优惠
+    const allPromos = getAllAvailablePromosWithDiscount();
+    
+    // 如果没有保存的优惠组合，计算最优组合
+    if (currentAutoPromotions.length === 0 && currentAutoDiscount === 0) {
+        const optimal = calculateOptimalPromoCombination(allPromos);
+        currentAutoPromotions = optimal.selectedPromos;
+        currentAutoDiscount = optimal.totalDiscount;
+    }
+    
+   // 处理优惠码 - 使用选中的优惠码 selectedCoupon
+    let couponDiscountAmount = 0;
+    let appliedCouponPromo = null;
+    let couponConflict = false;
 
+    // 关键修改：使用 selectedCoupon 而不是 appliedCoupon
+    if (selectedCoupon && selectedCouponDiscount > 0) {
+        couponDiscountAmount = selectedCouponDiscount;
+        appliedCouponPromo = selectedCoupon.promo;
+        couponConflict = !isCouponCompatibleWithAutoPromos(selectedCoupon.promo);
+    }
 
+    let totalDiscount = currentAutoDiscount;
+    let finalAppliedCoupon = null;
+    let finalCouponDiscount = 0;
+
+    // 如果没有冲突，将优惠码折扣加入总折扣
+    if (couponDiscountAmount > 0 && !couponConflict) {
+        totalDiscount += couponDiscountAmount;
+        finalAppliedCoupon = appliedCouponPromo;
+        finalCouponDiscount = couponDiscountAmount;
+    }
+    
+    const finalTotal = subtotal - totalDiscount;
+    
+    const { discount: ptsDisc, usedPoints } = calculatePointsDiscount(finalTotal, clientPoints);
+    pointsDiscount = usePoints ? ptsDisc : 0;
+    pointsToUse = usedPoints;
+    const finalTotalWithPoints = finalTotal - pointsDiscount;
+    
+    // 构建订单HTML
+    let orderHtml = itemsHtml;
+    orderHtml += `<div class="order-divider"></div>`;
+    orderHtml += `<div class="order-item order-subtotal">
+        <span>${t.subtotal}</span>
+        <span>${formatPrice(subtotal)} €</span>
+    </div>`;
+    
+    // 显示所有可用自动优惠（带复选框）
+    if (allPromos.length > 0) {
+        orderHtml += `<div class="order-section" style="margin: 16px 0; padding: 12px; background: #f8fafc; border-radius: 16px;">
+            <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">🎁 ${t.availablePromos}</div>`;
+        
+        for (const item of allPromos) {
+            const promo = item.promo;
+            const discountAmount = item.discount;
+            const detailInfo = item.detailInfo;
+            const isChecked = currentAutoPromotions.some(p => p.promo.id === promo.id);
+            
+            let promoText = '';
+            if (detailInfo.type === 'buy_n_get_m' && detailInfo.details) {
+                promoText = detailInfo.details.map(d => `${d.productName}: ${d.buyN} achetés = ${d.getM} gratuit (${d.times}x, -${formatPrice(d.discount)}€)`).join(', ');
+            } else if (detailInfo.type === 'discount') {
+                promoText = `${getPromotionName(promo)}: -${detailInfo.percent}% (${formatPrice(discountAmount)}€)`;
+            } else if (detailInfo.type === 'spend_reduce') {
+                promoText = `${getPromotionName(promo)}: -${formatPrice(discountAmount)}€`;
+            }
+            
+            orderHtml += `
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; cursor: pointer;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" class="auto-promo-checkbox" data-promo-id="${promo.id}" data-promo-stackable="${promo.stackable}" data-promo-discount="${discountAmount}" ${isChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-size: 13px;">${escapeHtml(promoText)}</span>
+                    </div>
+                    <span style="color: #10b981; font-size: 13px;">-${formatPrice(discountAmount)} €</span>
+                </label>
+            `;
+        }
+        
+        orderHtml += `</div>`;
+    }
+        // 显示优惠码列表（带复选框）
+    if (availableCoupons.length > 0) {
+        orderHtml += `<div class="order-section" style="margin: 16px 0; padding: 12px; background: #f8fafc; border-radius: 16px;">
+            <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">🎫 ${t.couponLabel}</div>`;
+        
+        for (const item of availableCoupons) {
+            const promo = item.promo;
+            const discountAmount = item.discount;
+            const isChecked = selectedCoupon && selectedCoupon.code === item.code;
+            
+            let promoText = '';
+            if (promo.type === 'discount') {
+                promoText = `${getPromotionName(promo)}: -${promo.discount_percent}% (${formatPrice(discountAmount)}€)`;
+            } else if (promo.type === 'spend_reduce') {
+                promoText = `${getPromotionName(promo)}: -${formatPrice(discountAmount)}€`;
+            } else if (promo.type === 'buy_n_get_m') {
+                promoText = `${getPromotionName(promo)}: ${promo.buy_n || 3} achetés = ${promo.get_m || 1} gratuit`;
+            }
+            
+            orderHtml += `
+                <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; cursor: pointer;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" class="coupon-checkbox" data-coupon-code="${item.code}" data-coupon-discount="${discountAmount}" data-coupon-stackable="${promo.stackable}" ${isChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-size: 13px;">🎫 ${escapeHtml(promoText)}</span>
+                    </div>
+                    <span style="color: #10b981; font-size: 13px;">-${formatPrice(discountAmount)} €</span>
+                </label>
+            `;
+        }
+        orderHtml += `</div>`;
+    }
+    // 显示已激活优惠汇总
+    if (currentAutoPromotions.length > 0) {
+        orderHtml += `<div class="order-item order-discount" style="margin-top: 8px; background: #e8f5e9; border-radius: 12px;">
+            <span>✅ ${t.activePromos}: ${currentAutoPromotions.length} 个</span>
+            <span style="color:#10b981;">-${formatPrice(currentAutoDiscount)} €</span>
+        </div>`;
+    }
+    
+    // 优惠码折扣
+    if (finalAppliedCoupon && finalCouponDiscount > 0 && selectedCoupon) {
+    orderHtml += `<div class="order-item order-discount">
+        <span>🎫 ${getPromotionName(finalAppliedCoupon)} (${escapeHtml(selectedCoupon.code)})</span>
+            <div>
+                <span style="color:#10b981;">-${formatPrice(finalCouponDiscount)} €</span>
+                <button class="remove-promo-btn" onclick="removeCoupon()" style="margin-left:8px; background:none; border:none; cursor:pointer; color:#e63946;">✕</button>
+            </div>
+        </div>`;
+    }
+    
+    // 优惠码冲突提示
+    if (couponConflict && couponDiscountAmount > 0 && appliedCouponPromo) {
+        orderHtml += `<div class="order-item order-warning" style="color:#d97706; font-size:13px; margin-top:8px; padding: 8px; background: #fef3c7; border-radius: 12px;">
+            ⚠️ ${t.couponConflict}
+            <div style="margin-top: 8px; display: flex; gap: 8px;">
+                <button class="use-coupon-only-btn" onclick="applyCouponOnly()" style="background:#2f6d9e; color:white; border:none; padding:4px 12px; border-radius:20px; cursor:pointer;">${t.useCouponOnly}</button>
+                <button class="keep-auto-only-btn" onclick="removeCouponAndRefresh()" style="background:#e2e8f0; border:none; padding:4px 12px; border-radius:20px; cursor:pointer;">${t.keepPromos}</button>
+            </div>
+        </div>`;
+    }
+    
+    // 积分抵扣
+    if (pointsDiscount > 0) {
+        orderHtml += `<div class="order-item order-discount">
+            <span>⭐ ${t.pointsRedeem} (${pointsToUse} pts)</span>
+            <span style="color:#10b981;">-${formatPrice(pointsDiscount)} €</span>
+        </div>`;
+    }
+    
+    orderHtml += `<div class="order-item order-total">
+        <span>${t.finalAmount}</span>
+        <span>${formatPrice(finalTotalWithPoints)} €</span>
+    </div>`;
+    
+    const expectedPoints = calculatePointsEarned(finalTotalWithPoints);
+    if (expectedPoints > 0) {
+        orderHtml += `<div class="order-item order-points">
+            <span>⭐ ${t.pointsWillEarn}</span>
+            <span>${expectedPoints} ${t.pointsAfterConfirm}</span>
+        </div>`;
+    }
+    
+    document.getElementById('orderItems').innerHTML = orderHtml;
+    
+    document.getElementById('orderTotalAmount').textContent = `${formatPrice(finalTotalWithPoints)} €`;
+    document.getElementById('orderModal').classList.add('active');
+    
+    // 绑定自动优惠复选框事件
+    document.querySelectorAll('.auto-promo-checkbox').forEach(checkbox => {
+        checkbox.removeEventListener('change', handlePromoCheckboxChange);
+        checkbox.addEventListener('change', handlePromoCheckboxChange);
+    });
+    
+    // 绑定优惠码复选框事件（添加这段）
+    document.querySelectorAll('.coupon-checkbox').forEach(checkbox => {
+        checkbox.removeEventListener('change', handleCouponCheckboxChange);
+        checkbox.addEventListener('change', handleCouponCheckboxChange);
+    });
+    // 积分复选框
+    const pointsCheck = document.getElementById('usePointsCheckbox');
+    if (pointsCheck) {
+        pointsCheck.checked = usePoints;
+        pointsCheck.onchange = async (e) => { 
+            usePoints = e.target.checked; 
+            await showOrderModal(); 
+        };
+    }
+    
+    // 优惠码按钮
+    const applyBtn = document.getElementById('applyCouponBtn');
+    if (applyBtn) {
+        const newBtn = applyBtn.cloneNode(true);
+        applyBtn.parentNode.replaceChild(newBtn, applyBtn);
+        newBtn.onclick = async () => {
+    const code = document.getElementById('couponCodeInput').value.trim().toUpperCase();
+    if (!code) return;
+    const msgDiv = document.getElementById('couponMessage');
+    const trans = translations[currentLang];
+    
+    // 检查是否已经在列表中
+    if (availableCoupons.some(c => c.code === code)) {
+        msgDiv.innerHTML = `<span style="color:#d97706;">⚠️ ${trans.couponAlreadyInList}</span>`;
+        return;
+    }
+    
+    const result = await applyCouponCode(code);
+    
+    if (!result.success) {
+        msgDiv.innerHTML = `<span style="color:#dc2626;">❌ ${result.message}</span>`;
+        return;
+    }
+    
+    const couponPromo = result.promo;
+    const discount = result.discount;
+    
+    // 检查与当前自动优惠是否兼容
+    const isCompatible = isCouponCompatibleWithAutoPromos(couponPromo);
+    
+    // 添加到列表
+    availableCoupons.push({ code, promo: couponPromo, discount });
+    msgDiv.innerHTML = `<span style="color:#10b981;">✅ ${trans.couponValid} - ${trans.couponAdded}</span>`;
+    document.getElementById('couponCodeInput').value = '';
+    
+    if (isCompatible) {
+        // 兼容：自动激活
+        selectedCoupon = { code, promo: couponPromo, discount };
+        selectedCouponDiscount = discount;
+        showCustomInfo(trans.success, `${trans.couponActivated} : ${discount.toFixed(2)}€`, 'success');
+    } else {
+        // 不兼容：只添加到列表，不激活
+        showCustomInfo(trans.warning, trans.couponConflict, 'warning');
+    }
+    
+    await showOrderModal();
+};
+ 
+    }
+}
+
+// 处理复选框变化
+// 处理自动促销复选框变化
+function handlePromoCheckboxChange(event) {
+    const checkbox = event.target;
+    const promoId = checkbox.dataset.promoId;
+    const discount = parseFloat(checkbox.dataset.promoDiscount);
+    const trans = translations[currentLang];
+    
+    // 获取完整的促销对象
+    const allPromos = getAllAvailablePromosWithDiscount();
+    const promoItem = allPromos.find(p => p.promo.id === promoId);
+    
+    if (!promoItem) return;
+    
+    if (checkbox.checked) {
+        // 勾选：检查与已选促销是否兼容
+        const isCompatible = isPromoCompatibleWithSelected(promoItem.promo, currentAutoPromotions);
+        
+        if (!isCompatible) {
+            // 冲突，显示确认弹窗
+            showCustomConfirm(
+                trans.promotionConflict,
+                trans.cannotStack + '\n' + trans.replaceQuestion,
+                () => {
+                    // 用户选择替换：清空当前，只保留这个
+                    currentAutoPromotions = [promoItem];
+                    currentAutoDiscount = promoItem.discount;
+                    // 确保复选框保持勾选状态
+                    checkbox.checked = true;
+                    showOrderModal();
+                },
+                () => {
+                    // 用户取消：取消勾选
+                    checkbox.checked = false;
+                    showOrderModal();
+                }
+            );
+        } else {
+            // 兼容，直接添加
+            currentAutoPromotions.push(promoItem);
+            currentAutoDiscount += promoItem.discount;
+            showOrderModal();
+        }
+    } else {
+        // 取消勾选：直接移除
+        const promoToRemove = currentAutoPromotions.find(p => p.promo.id === promoId);
+        if (promoToRemove) {
+            currentAutoDiscount -= promoToRemove.discount;
+            currentAutoPromotions = currentAutoPromotions.filter(p => p.promo.id !== promoId);
+        }
+        showOrderModal();
+    }
+}
+// 处理优惠码复选框变化
+function handleCouponCheckboxChange(event) {
+    const checkbox = event.target;
+    const couponCode = checkbox.dataset.couponCode;
+    
+    const couponItem = availableCoupons.find(c => c.code === couponCode);
+    if (!couponItem) return;
+    const trans = translations[currentLang];
+    
+    if (checkbox.checked) {
+        // 检查与当前自动优惠是否兼容
+        const isCompatible = isCouponCompatibleWithAutoPromos(couponItem.promo);
+        
+        if (!isCompatible) {
+            // 不兼容：不允许勾选，显示提示
+            showCustomInfo(trans.warning, trans.couponConflict, 'warning');
+            checkbox.checked = false;
+            return;
+        }
+        
+        // 兼容，直接选中并激活
+        const currentDiscount = calculateCouponDiscountAmount(couponItem.promo);
+        selectedCoupon = { code: couponCode, promo: couponItem.promo, discount: currentDiscount };
+        selectedCouponDiscount = currentDiscount;
+        couponItem.discount = currentDiscount;
+        showOrderModal();
+    } else {
+        // 取消勾选
+        if (selectedCoupon && selectedCoupon.code === couponCode) {
+            selectedCoupon = null;
+            selectedCouponDiscount = 0;
+        }
+        showOrderModal();
+    }
+}
+// ========== submitOrder ==========
 async function submitOrder() {
     const deliveryDate = document.getElementById('deliveryDate').value;
     const timeSlot = document.getElementById('deliveryTimeSlot').value;
     const notes = document.getElementById('orderNotes').value;
     const t = translations[currentLang];
     
-    // ========== 基础验证 ==========
     if (!deliveryDate) {
         showToast('Date requise', 'warning');
         return;
@@ -1616,7 +1567,7 @@ async function submitOrder() {
         return;
     }
     
-    // ========== 获取客户最新信息 ==========
+    // 获取客户最新信息
     const { data: client, error: clientError } = await window.supabase
         .from('clients')
         .select('id, kbis_verified, is_active, points')
@@ -1639,7 +1590,7 @@ async function submitOrder() {
         return;
     }
     
-    // ========== 获取最新库存 ==========
+    // 获取最新库存
     const { data: latestProducts, error: stockError } = await window.supabase
         .from('products')
         .select('id, quantity, name_fr, name_zh, price, promotion_price, is_promotion, category');
@@ -1663,7 +1614,7 @@ async function submitOrder() {
         });
     });
     
-    // ========== 验证库存 ==========
+    // 验证库存
     for (const item of cart) {
         const productStock = productMap.get(item.id);
         if (!productStock) {
@@ -1678,9 +1629,8 @@ async function submitOrder() {
         }
     }
     
-    // ========== 计算小计和商品列表 ==========
+    // 计算小计
     let subtotal = 0;
-    let normalSubtotal = 0;  // 非促销商品小计（用于折扣计算）
     const items = [];
     
     for (const item of cart) {
@@ -1694,10 +1644,6 @@ async function submitOrder() {
         const itemTotal = price * item.quantity;
         subtotal += itemTotal;
         
-        if (!productInfo.is_promotion) {
-            normalSubtotal += productInfo.price * item.quantity;
-        }
-        
         items.push({
             id: item.id,
             name_fr: productInfo.name_fr,
@@ -1709,229 +1655,36 @@ async function submitOrder() {
         });
     }
     
-    // ========== 获取优惠码促销对象 ==========
-    let couponPromo = null;
-    if (appliedCoupon) {
-        couponPromo = activePromotions.find(p => p.need_coupon && p.coupon_code === appliedCoupon);
-    }
-    
-    // ========== 1. 计算买N送M折扣（自动，无需优惠码） ==========
-    let buyNGetMDiscount = 0;
-    let buyNGetMDetails = [];
-    
-    for (const promo of activePromotions) {
-        if (promo.need_coupon) continue;
-        if (promo.type !== 'buy_n_get_m') continue;
-        
-        const buyN = promo.buy_n || 3;
-        const getM = promo.get_m || 1;
-        
-        for (const item of cart) {
-            const productInfo = productMap.get(item.id);
-            if (!productInfo) continue;
-            
-            // 检查商品是否符合条件
-            let isApplicable = false;
-            if (promo.applicable_products && promo.applicable_products.length > 0) {
-                if (promo.applicable_products.includes(item.id)) isApplicable = true;
-            } else if (promo.applicable_categories && promo.applicable_categories.length > 0) {
-                if (promo.applicable_categories.includes(productInfo.category)) isApplicable = true;
-            } else {
-                isApplicable = true;
-            }
-            
-            if (!isApplicable) continue;
-            
-            const currentPrice = productInfo.is_promotion && productInfo.promotion_price 
-                ? productInfo.promotion_price 
-                : productInfo.price;
-            
-            const times = Math.floor(item.quantity / buyN);
-            if (times > 0) {
-                const discount = times * getM * currentPrice;
-                buyNGetMDiscount += discount;
-                buyNGetMDetails.push({
-                    productName: currentLang === 'fr' ? productInfo.name_fr : productInfo.name_zh,
-                    buyN: buyN,
-                    getM: getM,
-                    times: times,
-                    discount: discount
-                });
+        // 使用当前选择的自动优惠和选中的优惠码
+   // 计算最终折扣
+        let totalDiscount = currentAutoDiscount;
+        let finalAppliedCoupon = null;
+        let finalCouponDiscount = 0;
+
+        // 如果有选中的优惠码且与自动优惠兼容，加入折扣
+        if (selectedCoupon && selectedCouponDiscount > 0) {
+            const isCompatible = isCouponCompatibleWithAutoPromos(selectedCoupon.promo);
+            if (isCompatible) {
+                finalCouponDiscount = selectedCouponDiscount;
+                finalAppliedCoupon = selectedCoupon.promo;
+                totalDiscount += finalCouponDiscount;
             }
         }
-    }
     
-    // ========== 2. 计算自动促销折扣（支持叠加，与购物车逻辑一致） ==========
-    let autoPromoDiscount = 0;
-    let appliedAutoPromos = [];
+    let finalTotal = subtotal - totalDiscount;
+    if (finalTotal < 0) finalTotal = 0;
     
-    for (const promo of activePromotions) {
-        if (promo.need_coupon) continue;
-        if (promo.type === 'buy_n_get_m') continue;
-        
-        let discount = 0;
-        
-        if (promo.type === 'discount' && promo.discount_percent) {
-            discount = normalSubtotal * promo.discount_percent / 100;
-        } else if (promo.type === 'spend_reduce') {
-            if (promo.spend_reduce_tiers) {
-                const tiers = typeof promo.spend_reduce_tiers === 'string' 
-                    ? JSON.parse(promo.spend_reduce_tiers) 
-                    : promo.spend_reduce_tiers;
-                if (Array.isArray(tiers)) {
-                    for (let i = tiers.length - 1; i >= 0; i--) {
-                        if (normalSubtotal >= tiers[i].min) {
-                            discount = tiers[i].reduce;
-                            break;
-                        }
-                    }
-                }
-            } else if (promo.min_amount && normalSubtotal >= promo.min_amount) {
-                discount = promo.reduce_amount || 0;
-            }
-        } else if (promo.type === 'free_shipping') {
-            discount = 0;  // 免运费不影响金额
-        }
-        
-        if (discount > 0) {
-            if (promo.stackable === true) {
-                // 可叠加：累加
-                autoPromoDiscount += discount;
-                appliedAutoPromos.push(promo);
-            } else if (discount > autoPromoDiscount) {
-                // 不可叠加：取最大的
-                autoPromoDiscount = discount;
-                appliedAutoPromos = [promo];
-            }
-        }
-    }
-    
-    // ========== 3. 计算优惠码折扣 ==========
-    let couponDiscountAmount = 0;
-    let couponPromoApplied = null;
-    
-    if (couponPromo) {
-        if (couponPromo.type === 'discount' && couponPromo.discount_percent) {
-            couponDiscountAmount = normalSubtotal * couponPromo.discount_percent / 100;
-            couponPromoApplied = couponPromo;
-        } else if (couponPromo.type === 'spend_reduce') {
-            if (couponPromo.spend_reduce_tiers) {
-                const tiers = typeof couponPromo.spend_reduce_tiers === 'string' 
-                    ? JSON.parse(couponPromo.spend_reduce_tiers) 
-                    : couponPromo.spend_reduce_tiers;
-                if (Array.isArray(tiers)) {
-                    for (let i = tiers.length - 1; i >= 0; i--) {
-                        if (normalSubtotal >= tiers[i].min) {
-                            couponDiscountAmount = tiers[i].reduce;
-                            couponPromoApplied = couponPromo;
-                            break;
-                        }
-                    }
-                }
-            } else if (couponPromo.min_amount && normalSubtotal >= couponPromo.min_amount) {
-                couponDiscountAmount = couponPromo.reduce_amount || 0;
-                couponPromoApplied = couponPromo;
-            }
-        } else if (couponPromo.type === 'buy_n_get_m') {
-            // 优惠码形式的买赠
-            const buyN = couponPromo.buy_n || 3;
-            const getM = couponPromo.get_m || 1;
-            for (const item of cart) {
-                const productInfo = productMap.get(item.id);
-                if (!productInfo) continue;
-                
-                let isApplicable = false;
-                if (couponPromo.applicable_products && couponPromo.applicable_products.length > 0) {
-                    if (couponPromo.applicable_products.includes(item.id)) isApplicable = true;
-                } else if (couponPromo.applicable_categories && couponPromo.applicable_categories.length > 0) {
-                    if (couponPromo.applicable_categories.includes(productInfo.category)) isApplicable = true;
-                } else {
-                    isApplicable = true;
-                }
-                
-                if (isApplicable && item.quantity >= buyN) {
-                    const currentPrice = productInfo.is_promotion && productInfo.promotion_price 
-                        ? productInfo.promotion_price 
-                        : productInfo.price;
-                    const discount = Math.floor(item.quantity / buyN) * getM * currentPrice;
-                    couponDiscountAmount += discount;
-                    couponPromoApplied = couponPromo;
-                }
-            }
-        }
-    }
-    
-    // ========== 4. 处理叠加逻辑（与 calculateDiscounts 一致） ==========
-    let totalDiscount = buyNGetMDiscount;
-    let finalAppliedPromotions = [];
-    let finalAppliedCoupon = null;
-    let finalCouponDiscount = 0;
-    
-    // 自动促销与优惠码的叠加处理
-    const autoStackable = appliedAutoPromos.length > 0 && appliedAutoPromos.every(p => p.stackable === true);
-    const couponStackable = couponPromoApplied?.stackable === true;
-    
-    if (autoPromoDiscount > 0 && couponDiscountAmount > 0) {
-        if (autoStackable && couponStackable) {
-            // 都可以叠加
-            totalDiscount += autoPromoDiscount + couponDiscountAmount;
-            finalAppliedPromotions = appliedAutoPromos;
-            finalAppliedCoupon = couponPromoApplied;
-            finalCouponDiscount = couponDiscountAmount;
-        } else if (autoStackable && !couponStackable) {
-            totalDiscount += autoPromoDiscount;
-            finalAppliedPromotions = appliedAutoPromos;
-            // 优惠码不叠加，但如果有更大的单独优惠？
-            if (couponDiscountAmount > autoPromoDiscount) {
-                totalDiscount = couponDiscountAmount;
-                finalAppliedPromotions = [];
-                finalAppliedCoupon = couponPromoApplied;
-                finalCouponDiscount = couponDiscountAmount;
-            }
-        } else if (!autoStackable && couponStackable) {
-            totalDiscount += couponDiscountAmount;
-            finalAppliedCoupon = couponPromoApplied;
-            finalCouponDiscount = couponDiscountAmount;
-            if (autoPromoDiscount > couponDiscountAmount) {
-                totalDiscount = autoPromoDiscount;
-                finalAppliedPromotions = appliedAutoPromos;
-                finalAppliedCoupon = null;
-                finalCouponDiscount = 0;
-            }
-        } else {
-            // 都不叠加，取最大的
-            if (autoPromoDiscount >= couponDiscountAmount) {
-                totalDiscount += autoPromoDiscount;
-                finalAppliedPromotions = appliedAutoPromos;
-            } else {
-                totalDiscount += couponDiscountAmount;
-                finalAppliedCoupon = couponPromoApplied;
-                finalCouponDiscount = couponDiscountAmount;
-            }
-        }
-    } else if (autoPromoDiscount > 0) {
-        totalDiscount += autoPromoDiscount;
-        finalAppliedPromotions = appliedAutoPromos;
-    } else if (couponDiscountAmount > 0) {
-        totalDiscount += couponDiscountAmount;
-        finalAppliedCoupon = couponPromoApplied;
-        finalCouponDiscount = couponDiscountAmount;
-    }
-    
-    // ========== 5. 计算积分抵扣 ==========
-    let afterPromoTotal = subtotal - totalDiscount;
-    if (afterPromoTotal < 0) afterPromoTotal = 0;
-    
+    // 积分抵扣
     let pointsDiscountAmount = 0;
     let pointsUsed = 0;
     
     if (usePoints && client.points > 0 && pointsConfig) {
         const maxDiscountPercent = pointsConfig.max_redeem_percent || 30;
-        const maxDiscount = afterPromoTotal * (maxDiscountPercent / 100);
+        const maxDiscount = finalTotal * (maxDiscountPercent / 100);
         const pointsValue = client.points * (pointsConfig.redeem_rate || 0.01);
         
         pointsDiscountAmount = Math.min(maxDiscount, pointsValue);
-        pointsDiscountAmount = Math.min(pointsDiscountAmount, afterPromoTotal);
+        pointsDiscountAmount = Math.min(pointsDiscountAmount, finalTotal);
         pointsUsed = Math.floor(pointsDiscountAmount / (pointsConfig.redeem_rate || 0.01));
         
         if (pointsUsed > client.points) {
@@ -1940,42 +1693,41 @@ async function submitOrder() {
         }
     }
     
-    // ========== 6. 计算最终总价 ==========
-    let finalTotal = afterPromoTotal - pointsDiscountAmount;
+    finalTotal = finalTotal - pointsDiscountAmount;
     if (finalTotal < 0) finalTotal = 0;
     
-    // ========== 7. 构建优惠详情字符串 ==========
-    let discountDetails = '';
+    // 构建优惠详情字符串
+    let discountDetailsStr = '';
     
-    if (buyNGetMDetails.length > 0) {
-        for (const detail of buyNGetMDetails) {
-            discountDetails += `🎁 ${detail.productName}: Achetez ${detail.buyN} = ${detail.getM} gratuit (${detail.times}x, économie ${formatPrice(detail.discount)}€)\n`;
-        }
-    }
-    
-    for (const promo of finalAppliedPromotions) {
-        const promoName = currentLang === 'fr' ? promo.name : (promo.name_zh || promo.name);
-        if (promo.type === 'discount') {
-            discountDetails += `🏷️ ${promoName}: -${promo.discount_percent}%\n`;
-        } else if (promo.type === 'spend_reduce') {
-            discountDetails += `🏷️ ${promoName}: Réduction\n`;
+    for (const item of currentAutoPromotions) {
+        const promo = item.promo;
+        const discountAmount = item.discount;
+        const detailInfo = item.detailInfo;
+        
+        if (detailInfo.type === 'buy_n_get_m' && detailInfo.details) {
+            for (const d of detailInfo.details) {
+                discountDetailsStr += `🎁 ${d.productName}: Achetez ${d.buyN} = ${d.getM} gratuit (${d.times}x, économie ${formatPrice(d.discount)}€)\n`;
+            }
+        } else if (detailInfo.type === 'discount') {
+            discountDetailsStr += `🏷️ ${getPromotionName(promo)}: -${detailInfo.percent}% (${formatPrice(discountAmount)}€)\n`;
+        } else if (detailInfo.type === 'spend_reduce') {
+            discountDetailsStr += `🏷️ ${getPromotionName(promo)}: Réduction de ${formatPrice(discountAmount)}€\n`;
         }
     }
     
     if (finalAppliedCoupon && finalCouponDiscount > 0) {
-        const promoName = currentLang === 'fr' ? finalAppliedCoupon.name : (finalAppliedCoupon.name_zh || finalAppliedCoupon.name);
-        discountDetails += `🎫 ${promoName} (${appliedCoupon}): -${formatPrice(finalCouponDiscount)}€\n`;
-    }
+    discountDetailsStr += `🎫 ${getPromotionName(finalAppliedCoupon)} (${selectedCoupon.code}): -${formatPrice(finalCouponDiscount)}€\n`;
+}
     
     if (pointsDiscountAmount > 0) {
-        discountDetails += `⭐ Points: ${pointsUsed} pts = -${formatPrice(pointsDiscountAmount)}€\n`;
+        discountDetailsStr += `⭐ Points: ${pointsUsed} pts = -${formatPrice(pointsDiscountAmount)}€\n`;
     }
     
-    if (discountDetails === '') {
-        discountDetails = 'Aucune réduction appliquée';
+    if (discountDetailsStr === '') {
+        discountDetailsStr = 'Aucune réduction appliquée';
     }
     
-    // ========== 8. 生成订单号 ==========
+    // 生成订单号
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -2000,16 +1752,16 @@ async function submitOrder() {
     
     const orderNumber = `YIDA-${dateStr}-${String(seq).padStart(4, '0')}`;
     
-    // ========== 9. 更新优惠码使用次数 ==========
-    if (finalAppliedCoupon && appliedCoupon) {
-        const newUsageCount = (finalAppliedCoupon.usage_count || 0) + 1;
-        await window.supabase
-            .from('promotions')
-            .update({ usage_count: newUsageCount })
-            .eq('id', finalAppliedCoupon.id);
-    }
+  // 更新优惠码使用次数
+if (finalAppliedCoupon && selectedCoupon) {
+    const newUsageCount = (finalAppliedCoupon.usage_count || 0) + 1;
+    await window.supabase
+        .from('promotions')
+        .update({ usage_count: newUsageCount })
+        .eq('id', finalAppliedCoupon.id);
+}
     
-    // ========== 10. 构建订单数据 ==========
+    // 构建订单数据
     const orderData = {
         order_number: orderNumber,
         client_id: currentClient.id,
@@ -2017,7 +1769,7 @@ async function submitOrder() {
         original_amount: subtotal,
         total_amount: finalTotal,
         discount_amount: subtotal - finalTotal,
-        discount_details: discountDetails,
+        discount_details: discountDetailsStr,
         delivery_date: deliveryDate,
         delivery_time_slot: timeSlot,
         status: 'pending',
@@ -2027,9 +1779,7 @@ async function submitOrder() {
     };
     
     console.log('📦 订单数据:', orderData);
-    console.log('📊 优惠详情:\n', discountDetails);
     
-    // ========== 11. 创建订单 ==========
     try {
         const { error: insertError, data: insertedOrder } = await window.supabase
             .from('customer_orders')
@@ -2043,7 +1793,7 @@ async function submitOrder() {
         
         console.log('✅ 订单创建成功:', insertedOrder);
         
-        // ========== 12. 更新库存 ==========
+        // 更新库存
         for (const item of cart) {
             const productStock = productMap.get(item.id);
             if (productStock) {
@@ -2060,7 +1810,7 @@ async function submitOrder() {
             }
         }
         
-        // ========== 13. 更新客户积分（扣减使用的积分） ==========
+        // 更新客户积分
         if (pointsUsed > 0) {
             const newPoints = client.points - pointsUsed;
             await window.supabase
@@ -2082,31 +1832,33 @@ async function submitOrder() {
             window.saveClientSession(currentClient);
         }
         
-        // ========== 14. 清空购物车和相关变量 ==========
+               // 清空购物车
         cart = [];
         saveCart();
+        
+        // 清空优惠相关变量（添加这几行）
+        availableCoupons = [];
+        selectedCoupon = null;
+        selectedCouponDiscount = 0;
         appliedCoupon = null;
         couponDiscount = 0;
+        
         usePoints = false;
         pointsDiscount = 0;
-        currentAppliedPromotions = [];
-        currentPromotionDiscount = 0;
+        currentAutoPromotions = [];
+        currentAutoDiscount = 0;
         
-        // ========== 15. 关闭模态框并显示成功 ==========
         document.getElementById('orderModal').classList.remove('active');
         showToast(`${t.orderSuccess} (${orderNumber})`, 'success');
         
-        // 清空表单
         document.getElementById('deliveryDate').value = '';
         document.getElementById('orderNotes').value = '';
         document.getElementById('couponCodeInput').value = '';
         document.getElementById('couponMessage').innerHTML = '';
         
-        // 刷新界面
         renderProducts();
         updateCartUI();
         
-        // 可选：2秒后提示跳转
         setTimeout(() => {
             if (confirm('Voir mes commandes ?')) {
                 window.location.href = '../client_orders/client_orders.html';
@@ -2118,10 +1870,85 @@ async function submitOrder() {
         showToast('Erreur: ' + (err.message || 'Commande échouée'), 'error');
     }
 }
+
+// ========== 移除促销相关函数 ==========
+window.removeAutoPromo = function(promoId) {
+    const promoToRemove = currentAutoPromotions.find(p => p.promo.id === promoId);
+    if (promoToRemove) {
+        currentAutoDiscount -= promoToRemove.discount;
+        currentAutoPromotions = currentAutoPromotions.filter(p => p.promo.id !== promoId);
+        showOrderModal();
+    }
+};
+
+window.removeAllAutoPromos = function() {
+    currentAutoDiscount = 0;
+    currentAutoPromotions = [];
+    showOrderModal();
+};
+
+window.applyCouponOnly = function() {
+    // 清空自动优惠
+    currentAutoPromotions = [];
+    currentAutoDiscount = 0;
+    
+    // 注意：这里需要找到当前冲突的优惠码并激活它
+    // 从 availableCoupons 中找到被勾选的那个优惠码
+    const checkedCoupon = document.querySelector('.coupon-checkbox:checked');
+    if (checkedCoupon) {
+        const couponCode = checkedCoupon.dataset.couponCode;
+        const couponItem = availableCoupons.find(c => c.code === couponCode);
+        if (couponItem) {
+            // 重新计算折扣
+            const currentDiscount = calculateCouponDiscountAmount(couponItem.promo);
+            selectedCoupon = { code: couponCode, promo: couponItem.promo, discount: currentDiscount };
+            selectedCouponDiscount = currentDiscount;
+            couponItem.discount = currentDiscount;
+        }
+    }
+    
+    showOrderModal();
+};
+
+window.removeCouponAndRefresh = function() {
+    appliedCoupon = null;
+    couponDiscount = 0;
+    document.getElementById('couponCodeInput').value = '';
+    document.getElementById('couponMessage').innerHTML = '';
+    showOrderModal();
+};
+
+window.removeCoupon = function(code) {
+    // 如果传入了具体优惠码，只删除那一个
+    if (code) {
+        availableCoupons = availableCoupons.filter(c => c.code !== code);
+        // 如果删除的正好是选中的，清空选中状态
+        if (selectedCoupon && selectedCoupon.code === code) {
+            selectedCoupon = null;
+            selectedCouponDiscount = 0;
+        }
+    } else {
+        // 没有传入code，清空所有
+        availableCoupons = [];
+        selectedCoupon = null;
+        selectedCouponDiscount = 0;
+    }
+    
+    document.getElementById('couponCodeInput').value = '';
+    document.getElementById('couponMessage').innerHTML = '';
+    updateCartUI();
+    showToast('Code promo supprimé', 'success');
+    
+    // 刷新订单弹窗
+    if (document.getElementById('orderModal').classList.contains('active')) {
+        showOrderModal();
+    }
+};
+
+// ========== 更新UI语言 ==========
 function updateUILanguage() {
     const t = translations[currentLang];
     
-    // 安全设置文本内容的辅助函数
     function setText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
@@ -2170,7 +1997,6 @@ function updateUILanguage() {
     const useLabel = document.getElementById('usePointsLabel');
     if (useLabel) useLabel.textContent = t.usePoints;
     
-    // ========== 配送时段下拉菜单（动态翻译，支持所有选项） ==========
     const timeSlotSelect = document.getElementById('deliveryTimeSlot');
     if (timeSlotSelect) {
         const slots = timeSlotSelect.options;
@@ -2186,7 +2012,6 @@ function updateUILanguage() {
         }
     }
     
-    // 返回按钮翻译
     const backBtn = document.getElementById('backToCategoriesBtn');
     if (backBtn) {
         backBtn.innerHTML = currentLang === 'fr' ? '← Retour aux catégories' : '← 返回分类';
@@ -2198,27 +2023,8 @@ function updateUILanguage() {
     updateCartUI();
 }
 
-// ========== 添加折扣标签区域到 HTML ==========
-function addDiscountTagsContainer() {
-    const cartFooter = document.querySelector('.cart-footer');
-    if (cartFooter && !document.getElementById('discountTags')) {
-        const discountTagsDiv = document.createElement('div');
-        discountTagsDiv.id = 'discountTags';
-        discountTagsDiv.style.marginBottom = '10px';
-        discountTagsDiv.style.display = 'flex';
-        discountTagsDiv.style.flexWrap = 'wrap';
-        discountTagsDiv.style.gap = '8px';
-        
-        const cartTotalDiv = cartFooter.querySelector('.cart-total');
-        if (cartTotalDiv) {
-            cartFooter.insertBefore(discountTagsDiv, cartTotalDiv);
-        }
-    }
-}
-
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', async () => {
-    // 语言切换按钮
     document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
@@ -2228,7 +2034,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     });
     
-    // 分类切换按钮
     document.querySelectorAll('.category-tab').forEach(tab => {
         tab.onclick = () => {
             document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
@@ -2238,24 +2043,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     });
     
-    // 购物车相关
     const cartIcon = document.getElementById('cartIcon');
     const closeCart = document.getElementById('closeCartBtn');
     const sidebar = document.getElementById('cartSidebar');
     if (cartIcon) cartIcon.onclick = () => sidebar.classList.add('open');
     if (closeCart) closeCart.onclick = () => sidebar.classList.remove('open');
     
-    // 模态框关闭
     const closeModal = document.getElementById('closeModalBtn');
     const authModal = document.getElementById('authModal');
     if (closeModal) closeModal.onclick = hideAuthModal;
     if (authModal) authModal.onclick = (e) => { if (e.target === authModal) hideAuthModal(); };
     
-    // 登录注册按钮
     document.getElementById('doLoginBtn').onclick = handleLogin;
     document.getElementById('doRegisterBtn').onclick = handleRegister;
     
-    // Tab切换
     document.querySelectorAll('.tab').forEach(tab => {
         tab.onclick = () => {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -2265,7 +2066,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     });
     
-    // 订单模态框
     const closeOrder = document.getElementById('closeOrderModalBtn');
     const orderModal = document.getElementById('orderModal');
     const checkoutBtn = document.getElementById('checkoutBtn');
@@ -2275,21 +2075,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (checkoutBtn) checkoutBtn.onclick = showOrderModal;
     if (submitBtn) submitBtn.onclick = submitOrder;
     
-    // 返回分类按钮
     const backBtn = document.getElementById('backToCategoriesBtn');
     if (backBtn) backBtn.onclick = backToCategories;
     
-    // ========== 加载数据 ==========
-        // 在 DOMContentLoaded 中
-        await loadPointsConfig();
-        await loadActivePromotions();  // 确保这行存在
-        await loadProducts();
-        loadCart();
-        updateAuthUI();
-        updateUILanguage();  // 这个会调用 updatePromotionMarquee
+    await loadPointsConfig();
+    await loadActivePromotions();
+    await loadProducts();
+    loadCart();
+    updateAuthUI();
+    updateUILanguage();
     
-    // ========== 页面初始状态 ==========
-    // 显示大类卡片，隐藏商品列表
     const categoriesGrid = document.getElementById('categoriesGrid');
     const productsSection = document.getElementById('productsSection');
     const categorySection = document.getElementById('categorySection');
@@ -2298,8 +2093,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (productsSection) productsSection.style.display = 'none';
     if (categorySection) categorySection.style.display = 'none';
 });
+
 window.addToCart = addToCart;
-window.updateCartItem = updateCartItem;
-window.removeCartItem = removeCartItem;
-window.removePromotion = removePromotion;
-window.removeCoupon = removeCoupon;
